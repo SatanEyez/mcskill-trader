@@ -1,0 +1,97 @@
+import type { Request, RequestHandler } from 'express';
+import { asyncHandler } from '../../utils/async-handler.js';
+import { logAction } from '../audit/audit.service.js';
+import * as userService from './user.service.js';
+import type {
+  UpdateUserAccessInput,
+  UpdateUserRoleInput,
+  UserIdParams,
+} from './user.schema.js';
+import type { ListUsersQuery } from './user.types.js';
+
+function getId(req: Request): string {
+  return (req.validatedParams as UserIdParams).id;
+}
+
+export const listUsers: RequestHandler = asyncHandler(async (req, res) => {
+  const query = req.validatedQuery as ListUsersQuery;
+  const result = await userService.listUsers(query);
+
+  res.json({ data: result.data, meta: result.meta });
+});
+
+export const approveUser: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await userService.approveUser(getId(req), req.auth!);
+
+  await logAction(req, {
+    action: 'user.approve',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: { login: data.login },
+  });
+
+  res.json({ data });
+});
+
+export const rejectUser: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await userService.rejectUser(getId(req), req.auth!);
+
+  await logAction(req, {
+    action: 'user.reject',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: { login: data.login },
+  });
+
+  res.json({ data });
+});
+
+export const deleteUser: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await userService.deleteUser(getId(req), req.auth!);
+
+  await logAction(req, {
+    action: 'user.delete',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: { login: data.login, status: data.status },
+  });
+
+  res.json({ data });
+});
+
+export const updateUserRole: RequestHandler = asyncHandler(async (req, res) => {
+  const { role } = req.validatedBody as UpdateUserRoleInput;
+  const { data, previous } = await userService.changeUserRole(getId(req), role, req.auth!);
+
+  await logAction(req, {
+    action: 'user.role_change',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: { login: data.login, from: previous.role, to: data.role },
+  });
+
+  res.json({ data });
+});
+
+export const updateUserAccess: RequestHandler = asyncHandler(async (req, res) => {
+  const input = req.validatedBody as UpdateUserAccessInput;
+  const { data, previous } = await userService.updateUserAccess(getId(req), input, req.auth!);
+
+  await logAction(req, {
+    action: 'access.user_update',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: {
+      login: data.login,
+      role: { from: previous.role_name, to: data.role_name },
+      prefix: { from: previous.prefix?.name ?? null, to: data.prefix?.name ?? null },
+    },
+  });
+
+  res.json({ data });
+});

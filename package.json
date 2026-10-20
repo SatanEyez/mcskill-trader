@@ -1,0 +1,27 @@
+{
+  "name": "mcskill-trader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Трейд-калькулятор минимальных цен для сервера McSkill OneBlock",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace server && npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "db:seed": "npm run db:seed --workspace server",
+    "db:seed:force": "npm run db:seed:force --workspace server",
+    "test:api": "node api-test.mjs",
+    "test:load": "node load-test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

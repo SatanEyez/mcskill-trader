@@ -1,0 +1,140 @@
+import type { Request, RequestHandler } from 'express';
+import type { z } from 'zod';
+import { asyncHandler } from '../../utils/async-handler.js';
+import { logAction } from '../audit/audit.service.js';
+import { createResourceSchema, updateResourceSchema } from './resource.schema.js';
+import * as resourceService from './resource.service.js';
+import type {
+  ListResourcesQuery,
+  ResourceDto,
+  ResourceInput,
+  ResourceUpdate,
+} from './resource.types.js';
+
+type CreateBody = z.infer<typeof createResourceSchema>;
+type UpdateBody = z.infer<typeof updateResourceSchema>;
+
+interface FieldChange {
+  from: string | number | null;
+  to: string | number | null;
+}
+
+function getId(req: Request): string {
+  return req.params.id as string;
+}
+
+/** Только реально изменённые поля — чтобы в журнале не было шума. */
+function describeChanges(previous: ResourceDto, next: ResourceDto): Record<string, FieldChange> {
+  const changes: Record<string, FieldChange> = {};
+
+  if (previous.name !== next.name) {
+    changes.name = { from: previous.name, to: next.name };
+  }
+
+  if (previous.name_color !== next.name_color) {
+    changes.name_color = { from: previous.name_color, to: next.name_color };
+  }
+
+  if (previous.min_price !== next.min_price) {
+    changes.min_price = { from: previous.min_price, to: next.min_price };
+  }
+
+  if (previous.image_url !== next.image_url) {
+    changes.image_url = { from: previous.image_url, to: next.image_url };
+  }
+
+  if (previous.category !== next.category) {
+    changes.category = { from: previous.category, to: next.category };
+  }
+
+  return changes;
+}
+
+export const listResources: RequestHandler = asyncHandler(async (req, res) => {
+  const query = req.validatedQuery as ListResourcesQuery;
+  const result = await resourceService.listResources(query);
+
+  res.json({
+    data: result.data,
+    meta: {
+      total: result.total,
+      count: result.data.length,
+      page: result.page,
+      limit: result.limit,
+      pages: result.pages,
+    },
+  });
+});
+
+export const getCatalog: RequestHandler = asyncHandler(async (_req, res) => {
+  const data = await resourceService.listCatalog();
+  res.json({ data, meta: { total: data.length, count: data.length } });
+});
+
+export const getStats: RequestHandler = asyncHandler(async (_req, res) => {
+  res.json({ data: await resourceService.getResourceStats() });
+});
+
+export const getResource: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await resourceService.getResourceById(getId(req));
+  res.json({ data });
+});
+
+export const createResource: RequestHandler = asyncHandler(async (req, res) => {
+  const body = req.validatedBody as CreateBody;
+  const data = await resourceService.createResource(body as ResourceInput);
+
+  await logAction(req, {
+    action: 'resource.create',
+    entityType: 'resource',
+    entityId: data.id,
+    entityLabel: data.name,
+    details: {
+      min_price: data.min_price,
+      category: data.category,
+      image_url: data.image_url,
+      name_color: data.name_color,
+    },
+  });
+
+  res.status(201).json({ data });
+});
+
+export const updateResource: RequestHandler = asyncHandler(async (req, res) => {
+  const body = req.validatedBody as UpdateBody;
+  const { data, previous } = await resourceService.updateResource(
+    getId(req),
+    body as ResourceUpdate,
+  );
+  const changes = describeChanges(previous, data);
+
+  if (Object.keys(changes).length > 0) {
+    await logAction(req, {
+      action: 'resource.update',
+      entityType: 'resource',
+      entityId: data.id,
+      entityLabel: data.name,
+      details: { changes },
+    });
+  }
+
+  res.json({ data });
+});
+
+export const deleteResource: RequestHandler = asyncHandler(async (req, res) => {
+  const deleted = await resourceService.deleteResource(getId(req));
+
+  await logAction(req, {
+    action: 'resource.delete',
+    entityType: 'resource',
+    entityId: deleted.id,
+    entityLabel: deleted.name,
+    details: {
+      min_price: deleted.min_price,
+      category: deleted.category,
+      name_color: deleted.name_color,
+    },
+  });
+
+  res.json({ data: { id: deleted.id } });
+});

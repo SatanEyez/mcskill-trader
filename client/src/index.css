@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-void font-sans text-slate-300 antialiased;
+    background-image:
+      radial-gradient(ellipse 70% 45% at 50% -12%, rgba(52, 211, 153, 0.1), transparent 65%),
+      radial-gradient(ellipse 45% 35% at 100% 25%, rgba(34, 211, 238, 0.045), transparent 65%),
+      radial-gradient(ellipse 40% 35% at 0% 80%, rgba(16, 185, 129, 0.035), transparent 65%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    @apply bg-accent/30 text-white;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight text-white;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #070c11;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #1e2d38;
+    border: 2px solid #070c11;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2b4050;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-[1240px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-white/[0.06] bg-panel/80 shadow-card backdrop-blur-sm;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-white/10 bg-void/60 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-accent/60 focus:ring-2 focus:ring-accent/20;
+  }
+
+  .field-label {
+    @apply mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-void disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-[#04110c] shadow-glow-sm hover:bg-accent-300 active:translate-y-px;
+  }
+
+  .btn-secondary {
+    @apply border border-white/10 bg-white/[0.04] text-slate-200 hover:border-accent/40 hover:bg-white/[0.07] hover:text-white;
+  }
+
+  .btn-ghost {
+    @apply text-slate-400 hover:bg-white/[0.05] hover:text-white;
+  }
+
+  .btn-danger {
+    @apply border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20;
+  }
+
+  .icon-btn {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-slate-400 transition hover:border-accent/30 hover:bg-accent/10 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50;
+  }
+
+  .chip {
+    @apply inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50;
+  }
+
+  .pixelated {
+    image-rendering: pixelated;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .bg-grid-mask {
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, black 25%, transparent 78%);
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, black 25%, transparent 78%);
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent-300 via-emerald-200 to-cyan-300 bg-clip-text text-transparent;
+  }
+
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
