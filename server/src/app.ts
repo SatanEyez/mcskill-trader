@@ -12,6 +12,7 @@ import { requestLogger } from './middleware/request-logger.js';
 import { auditRouter } from './modules/audit/audit.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { categoryRouter } from './modules/categories/category.routes.js';
+import { chatRouter } from './modules/chat/chat.routes.js';
 import { importRouter } from './modules/import/import.routes.js';
 import { newsRouter } from './modules/news/news.routes.js';
 import { presenceRouter } from './modules/presence/presence.routes.js';
@@ -89,6 +90,7 @@ export function createApp(): Express {
   app.use('/api/news', newsRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/presence', presenceRouter);
+  app.use('/api/chat', chatRouter);
   app.use('/api', notFound);
 
   // Иконки прайса лежат в git и отдаются статикой (и в dev, и в проде:

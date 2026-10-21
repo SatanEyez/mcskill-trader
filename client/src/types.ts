@@ -53,6 +53,34 @@ export interface ResourceStats {
   categories: Array<{ id: string; name: string; count: number }>;
 }
 
+/* ── Служебный чат администраторов ─────────────────────────────────── */
+
+export interface ChatRoomLastMessage {
+  login: string;
+  message: string;
+  created_at: string;
+}
+
+export interface ChatRoom {
+  id: string;
+  name: string;
+  created_by_login: string | null;
+  created_at: string;
+  /** Сколько сообщений пользователь ещё не прочитал. */
+  unread_count: number;
+  last_message: ChatRoomLastMessage | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  user_id: string | null;
+  user_login: string;
+  avatar_url: string | null;
+  message: string;
+  created_at: string;
+}
+
 export interface Category {
   id: string;
   name: string;

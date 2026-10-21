@@ -12,6 +12,8 @@ import type {
   AuditLogMeta,
   AuditPeriod,
   Category,
+  ChatMessage,
+  ChatRoom,
   ExcludedResource,
   ImportJob,
   ImportSummary,
@@ -837,6 +839,54 @@ export async function fetchVisitors(
 
   const suffix = query.size > 0 ? `?${query.toString()}` : '';
   return request<{ data: VisitorEntry[]; meta: ApiMeta }>(`/stats/visitors${suffix}`, {
+    auth: true,
+  });
+}
+
+// ── Служебный чат ────────────────────────────────────────────
+
+export async function fetchChatRooms(): Promise<ChatRoom[]> {
+  const response = await request<{ data: ChatRoom[] }>('/chat/rooms', { auth: true });
+  return response.data;
+}
+
+export async function createChatRoom(name: string): Promise<ChatRoom> {
+  const response = await request<{ data: ChatRoom }>('/chat/rooms', {
+    method: 'POST',
+    body: { name },
+    auth: true,
+  });
+  return response.data;
+}
+
+export async function fetchChatMessages(
+  roomId: string,
+  params: { before?: string; limit?: number } = {},
+): Promise<ChatMessage[]> {
+  const query = new URLSearchParams();
+
+  if (params.before) query.set('before', params.before);
+  if (params.limit) query.set('limit', String(params.limit));
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  const response = await request<{ data: ChatMessage[] }>(
+    `/chat/rooms/${encodeURIComponent(roomId)}/messages${suffix}`,
+    { auth: true },
+  );
+  return response.data;
+}
+
+export async function sendChatMessage(roomId: string, message: string): Promise<ChatMessage> {
+  const response = await request<{ data: ChatMessage }>(
+    `/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+    { method: 'POST', body: { message }, auth: true },
+  );
+  return response.data;
+}
+
+export async function markChatRoomRead(roomId: string): Promise<void> {
+  await request<null>(`/chat/rooms/${encodeURIComponent(roomId)}/read`, {
+    method: 'POST',
     auth: true,
   });
 }

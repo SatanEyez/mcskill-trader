@@ -5,6 +5,7 @@ import { closeDb } from './db/index.js';
 import { runMigrations } from './db/migrate.js';
 import { seedDatabase } from './db/seed.js';
 import { ensureBootstrapAdmin } from './modules/auth/bootstrap.js';
+import { closeChatSocket, initChatSocket } from './modules/chat/chat.socket.js';
 import { logger } from './utils/logger.js';
 
 async function bootstrap(): Promise<void> {
@@ -22,6 +23,7 @@ async function bootstrap(): Promise<void> {
 
   const app = createApp();
   const server = createServer(app);
+  initChatSocket(server);
 
   server.listen(env.PORT, () => {
     logger.ready(`API доступно: http://localhost:${env.PORT}/api`);
@@ -43,6 +45,9 @@ async function bootstrap(): Promise<void> {
       process.exit(1);
     }, 10_000);
     forceExit.unref();
+
+    // Сначала отпускаем WebSocket-подключения чата, иначе server.close ждёт их.
+    closeChatSocket();
 
     server.close(() => {
       void closeDb()

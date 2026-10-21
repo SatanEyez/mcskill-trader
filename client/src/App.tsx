@@ -10,6 +10,7 @@ import { NewsPostPage } from './pages/NewsPostPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminPage } from './pages/AdminPage';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
+import { AdminChatPage } from './pages/AdminChatPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminLogsPage } from './pages/AdminLogsPage';
 import { AdminAccessPage } from './pages/AdminAccessPage';
@@ -231,6 +232,16 @@ export function App() {
                 <RequireAdmin>
                   <RequirePermission permission="stats.view">
                     <AdminStatsPage />
+                  </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/chat"
+              element={
+                <RequireAdmin>
+                  <RequirePermission permission="chat.use">
+                    <AdminChatPage />
                   </RequirePermission>
                 </RequireAdmin>
               }

@@ -25,6 +25,7 @@ export const PERMISSIONS = [
   { key: 'support.read', group: 'Обращения', label: 'Просмотр обращений' },
   { key: 'support.write', group: 'Обращения', label: 'Ответы на обращения' },
   { key: 'presence.view', group: 'Панель', label: 'Список администраторов онлайн' },
+  { key: 'chat.use', group: 'Чат', label: 'Служебный чат администраторов' },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number]['key'];

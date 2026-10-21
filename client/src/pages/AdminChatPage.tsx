@@ -1,0 +1,481 @@
+﻿import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  ArrowLeft,
+  MessageSquarePlus,
+  MessagesSquare,
+  Send,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import clsx from 'clsx';
+import { Link } from 'react-router-dom';
+import { useChat } from '../hooks/useChat';
+import { useAuth } from '../context/AuthContext';
+import { formatDateMsk, formatDateTimeMsk, formatTimeMsk } from '../lib/format';
+import { isChatSoundEnabled, CHAT_SOUND_CHANGED_EVENT } from '../lib/chat-sound';
+import type { ChatMessage, ChatRoom } from '../types';
+import { AdminHeader } from '../components/admin/AdminHeader';
+import { AdminTabs } from '../components/admin/AdminTabs';
+import { AdminAvatar } from '../components/admin/AdminAvatar';
+import { Modal } from '../components/ui/Modal';
+import { Spinner } from '../components/ui/Spinner';
+
+function previewOf(room: ChatRoom): string {
+  if (!room.last_message) return 'Сообщений пока нет';
+
+  const text = room.last_message.message.replace(/\s+/g, ' ').trim();
+
+  return `${room.last_message.login}: ${text}`;
+}
+
+function roomTime(room: ChatRoom): string {
+  const stamp = room.last_message?.created_at ?? room.created_at;
+  return formatTimeMsk(stamp);
+}
+
+function MessageBubble({ message, own }: { message: ChatMessage; own: boolean }) {
+  return (
+    <div className={clsx('flex w-full gap-2.5', own ? 'flex-row-reverse' : 'flex-row')}>
+      <AdminAvatar
+        login={message.user_login}
+        avatarUrl={message.avatar_url}
+        size="sm"
+        rounded="xl"
+        initials={1}
+      />
+
+      <div className={clsx('flex min-w-0 max-w-[78%] flex-col', own ? 'items-end' : 'items-start')}>
+        <div className="flex items-baseline gap-2 text-[10px] text-slate-500">
+          <span className="font-medium text-slate-400">{message.user_login}</span>
+          <span>{formatTimeMsk(message.created_at)}</span>
+        </div>
+        <div
+          className={clsx(
+            'mt-1 whitespace-pre-wrap break-words rounded-2xl border px-3.5 py-2 text-sm leading-relaxed shadow-sm',
+            own
+              ? 'rounded-tr-md border-accent/25 bg-accent/[0.12] text-accent-50'
+              : 'rounded-tl-md border-white/[0.07] bg-white/[0.04] text-slate-200',
+          )}
+        >
+          {message.message}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AdminChatPage() {
+  const { user } = useAuth();
+  const {
+    rooms,
+    activeRoomId,
+    messages,
+    loadingRooms,
+    loadingMessages,
+    loadingOlder,
+    sending,
+    error,
+    hasMore,
+    selectRoom,
+    loadOlder,
+    send,
+    createRoom,
+    reload,
+  } = useChat();
+
+  const [draft, setDraft] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [roomName, setRoomName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(isChatSoundEnabled);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const nearBottomRef = useRef(true);
+
+  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null;
+  const totalUnread = rooms.reduce((sum, room) => sum + room.unread_count, 0);
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'Служебный чат — McSkill Trader';
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setSoundEnabled(isChatSoundEnabled());
+    window.addEventListener(CHAT_SOUND_CHANGED_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(CHAT_SOUND_CHANGED_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  // Прокрутка: вниз при открытии комнаты и когда пользователь у нижнего края.
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+
+    if (nearBottomRef.current || messages.length <= 1) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages, activeRoomId]);
+
+  useEffect(() => {
+    nearBottomRef.current = true;
+  }, [activeRoomId]);
+
+  const handleScroll = () => {
+    const container = listRef.current;
+    if (!container) return;
+
+    nearBottomRef.current =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+  };
+
+  const handleSend = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!draft.trim() || sending) return;
+
+    const ok = await send(draft);
+    if (ok) {
+      setDraft('');
+      nearBottomRef.current = true;
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleCreate = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!roomName.trim() || creating) return;
+
+    setCreating(true);
+    setCreateError(null);
+
+    const room = await createRoom(roomName.trim());
+    setCreating(false);
+
+    if (!room) {
+      setCreateError('Не удалось создать комнату');
+      return;
+    }
+
+    setCreateOpen(false);
+    setRoomName('');
+    await selectRoom(room.id);
+  };
+
+  const openRoom = (roomId: string) => {
+    void selectRoom(roomId);
+    window.setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const lastDayRef = useRef<string | null>(null);
+
+  return (
+    <div className="min-h-screen">
+      <AdminHeader />
+      <AdminTabs />
+
+      <main className="container-page py-6 sm:py-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
+              Команда
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Служебный чат</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+              Внутренняя переписка администрации. Сообщения сохраняются в базе, непрочитанные
+              считаются по комнатам.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+            {soundEnabled ? (
+              <Volume2 className="h-3.5 w-3.5 text-accent" aria-hidden />
+            ) : (
+              <VolumeX className="h-3.5 w-3.5" aria-hidden />
+            )}
+            Звук уведомлений{' '}
+            <Link to="/admin/profile" className="text-accent hover:text-accent-300">
+              {soundEnabled ? 'включён' : 'выключен'} · настроить
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-5 grid overflow-hidden rounded-2xl border border-white/[0.06] bg-panel/60 lg:grid-cols-[300px_minmax(0,1fr)]">
+          {/* Список комнат */}
+          <aside
+            className={clsx(
+              'flex min-h-0 flex-col border-white/[0.06] bg-black/20 lg:h-[600px] lg:border-r',
+              activeRoom ? 'hidden lg:flex' : 'flex',
+            )}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2.5">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                <MessagesSquare className="h-3.5 w-3.5" aria-hidden />
+                Комнаты
+                {totalUnread > 0 && (
+                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold text-[#04110c]">
+                    {totalUnread}
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => void reload(true)}
+                className="icon-btn h-7 w-7"
+                title="Обновить список"
+                aria-label="Обновить список комнат"
+              >
+                <Spinner className={clsx('h-3 w-3', loadingRooms && 'animate-spin')} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {loadingRooms && rooms.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-slate-500">Загружаем…</p>
+              ) : rooms.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-slate-500">
+                  Комнат пока нет. Создайте первую.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {rooms.map((room) => (
+                    <li key={room.id}>
+                      <button
+                        type="button"
+                        onClick={() => openRoom(room.id)}
+                        className={clsx(
+                          'w-full rounded-xl px-3 py-2.5 text-left transition',
+                          room.id === activeRoomId
+                            ? 'bg-accent/[0.12] ring-1 ring-inset ring-accent/25'
+                            : 'hover:bg-white/[0.04]',
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={clsx(
+                              'flex min-w-0 items-center gap-1.5 truncate text-sm font-medium',
+                              room.id === activeRoomId ? 'text-accent' : 'text-slate-200',
+                            )}
+                          >
+                            <span className="text-slate-500">#</span>
+                            <span className="truncate">{room.name}</span>
+                          </span>
+
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="text-[10px] text-slate-600">{roomTime(room)}</span>
+                            {room.unread_count > 0 && (
+                              <span className="grid h-4 min-w-4 place-items-center rounded-full bg-rose-400/90 px-1 text-[10px] font-bold text-[#1b0505]">
+                                {room.unread_count > 99 ? '99+' : room.unread_count}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-[11px] text-slate-500">
+                          {previewOf(room)}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="border-t border-white/[0.06] p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateError(null);
+                  setRoomName('');
+                  setCreateOpen(true);
+                }}
+                className="btn btn-secondary w-full px-3 py-2 text-xs"
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden />
+                Создать комнату
+              </button>
+            </div>
+          </aside>
+
+          {/* Окно переписки */}
+          <section
+            className={clsx(
+              'flex min-h-0 flex-col lg:h-[600px]',
+              activeRoom ? 'flex' : 'hidden lg:flex',
+            )}
+          >
+            {!activeRoom ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                <span className="grid h-14 w-14 place-items-center rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+                  <MessagesSquare className="h-6 w-6 text-slate-500" aria-hidden />
+                </span>
+                <p className="text-sm font-medium text-white">Выберите комнату</p>
+                <p className="max-w-sm text-xs leading-relaxed text-slate-500">
+                  Слева — список каналов команды. Непрочитанные сообщения отмечены счётчиком.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-2.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.history.back();
+                      }}
+                      className="icon-btn h-7 w-7 shrink-0 lg:hidden"
+                      aria-label="Назад к комнатам"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">
+                        <span className="text-slate-500"># </span>
+                        {activeRoom.name}
+                      </p>
+                      <p className="truncate text-[10px] text-slate-500">
+                        {activeRoom.created_by_login
+                          ? `создал ${activeRoom.created_by_login}`
+                          : 'общий канал'}{' '}
+                        · {formatDateTimeMsk(activeRoom.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  ref={listRef}
+                  onScroll={handleScroll}
+                  className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+                >
+                  {hasMore && (
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => void loadOlder()}
+                        disabled={loadingOlder}
+                        className="btn btn-secondary px-3 py-1.5 text-[11px]"
+                      >
+                        {loadingOlder ? <Spinner className="h-3 w-3" /> : null}
+                        Загрузить более ранние
+                      </button>
+                    </div>
+                  )}
+
+                  {loadingMessages ? (
+                    <p className="py-10 text-center text-xs text-slate-500">Загружаем сообщения…</p>
+                  ) : messages.length === 0 ? (
+                    <p className="py-10 text-center text-xs text-slate-500">
+                      Сообщений пока нет — напишите первым.
+                    </p>
+                  ) : (
+                    messages.map((message) => {
+                      const own = message.user_id !== null && message.user_id === user?.id;
+                      const day = formatDateMsk(message.created_at);
+                      const showDay = day !== lastDayRef.current;
+
+                      if (showDay) {
+                        lastDayRef.current = day;
+                      }
+
+                      return (
+                        <div key={message.id}>
+                          {showDay && (
+                            <p className="mb-2 mt-1 text-center text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                              {day}
+                            </p>
+                          )}
+                          <MessageBubble message={message} own={own} />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {error && (
+                  <p className="border-t border-rose-400/20 bg-rose-400/[0.06] px-4 py-2 text-[11px] text-rose-200">
+                    {error}
+                  </p>
+                )}
+
+                <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-white/[0.06] p-3">
+                  <input
+                    ref={inputRef}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder={`Сообщение в #${activeRoom.name}…`}
+                    maxLength={4000}
+                    className="field flex-1 py-2.5 text-sm"
+                    aria-label="Текст сообщения"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending || !draft.trim()}
+                    className="btn btn-primary shrink-0 px-3.5 py-2.5"
+                    aria-label="Отправить сообщение"
+                  >
+                    {sending ? <Spinner /> : <Send className="h-4 w-4" aria-hidden />}
+                  </button>
+                </form>
+              </>
+            )}
+          </section>
+        </div>
+      </main>
+
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Новая комната"
+        description="Канал увидят все администраторы с доступом к чату."
+        size="sm"
+        footer={
+          <>
+            <button type="button" onClick={() => setCreateOpen(false)} className="btn btn-ghost">
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={(event) => void handleCreate(event)}
+              disabled={creating || roomName.trim().length < 2}
+              className="btn btn-primary"
+            >
+              {creating ? <Spinner /> : <MessageSquarePlus className="h-4 w-4" aria-hidden />}
+              Создать
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <label className="block">
+            <span className="field-label">Название комнаты</span>
+            <input
+              value={roomName}
+              onChange={(event) => {
+                setRoomName(event.target.value);
+                setCreateError(null);
+              }}
+              placeholder="Например, Смена"
+              maxLength={60}
+              autoFocus
+              className="field"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleCreate(event);
+                }
+              }}
+            />
+          </label>
+          {createError && <p className="text-[11px] text-rose-300">{createError}</p>}
+        </div>
+      </Modal>
+    </div>
+  );
+}

@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Crown, ImagePlus, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import {
+  Camera,
+  Crown,
+  ImagePlus,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { ApiError, deleteAvatar, uploadAvatar } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatDateTimeMsk } from '../lib/format';
+import { isChatSoundEnabled, setChatSoundEnabled } from '../lib/chat-sound';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
@@ -33,6 +43,7 @@ export function AdminProfilePage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [soundEnabled, setSoundEnabledState] = useState(isChatSoundEnabled);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -113,6 +124,18 @@ export function AdminProfilePage() {
   };
 
   const shownAvatar = previewUrl ?? user.avatar_url;
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setChatSoundEnabled(next);
+    setSoundEnabledState(next);
+    notify(
+      next
+        ? 'Звуковые уведомления чата включены'
+        : 'Звуковые уведомления чата выключены',
+      'info',
+    );
+  };
 
   return (
     <div className="min-h-screen">
@@ -285,6 +308,50 @@ export function AdminProfilePage() {
             </div>
           </section>
         </div>
+
+        <section className="panel mt-4 p-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+            {soundEnabled ? (
+              <Volume2 className="h-4 w-4 text-accent" aria-hidden />
+            ) : (
+              <VolumeX className="h-4 w-4 text-slate-500" aria-hidden />
+            )}
+            Уведомления
+          </h2>
+
+          <div className="mt-4 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Включить звуковые уведомления</p>
+              <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-slate-500">
+                Звук из служебного чата. Срабатывает только если переключатель включён и
+                вкладка браузера неактивна (вы в другом окне или приложении). По умолчанию
+                выключено.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundEnabled}
+              aria-label="Включить звуковые уведомления"
+              onClick={toggleSound}
+              className={clsx(
+                'relative h-6 w-11 shrink-0 rounded-full border transition',
+                soundEnabled
+                  ? 'border-accent/40 bg-accent/30'
+                  : 'border-white/[0.08] bg-white/[0.05]',
+              )}
+            >
+              <span
+                className={clsx(
+                  'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
+                  soundEnabled ? 'left-[22px]' : 'left-0.5',
+                )}
+                aria-hidden
+              />
+            </button>
+          </div>
+        </section>
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Boxes,
+  MessagesSquare,
   Newspaper,
   ScrollText,
   ShieldCheck,
@@ -14,6 +15,7 @@ import clsx from 'clsx';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePendingUsersCount } from '../../hooks/useAdminUsers';
+import { useChatUnreadBadge } from '../../hooks/useChat';
 import { useTicketStats } from '../../hooks/useTicketStats';
 
 interface Tab {
@@ -33,6 +35,7 @@ const TABS: Tab[] = [
   { to: '/admin/categories', label: 'Категории', icon: Tags, end: false, permission: 'categories.read' },
   { to: '/admin/news', label: 'Новости', icon: Newspaper, end: false, permission: 'news.write' },
   { to: '/admin/support', label: 'Обращения', icon: MessageSquareWarning, end: false, permission: 'support.read' },
+  { to: '/admin/chat', label: 'Служебный чат', icon: MessagesSquare, end: false, permission: 'chat.use' },
   { to: '/admin/users', label: 'Пользователи', icon: UsersRound, end: false, permission: 'users.read' },
   {
     to: '/admin/access',
@@ -61,6 +64,7 @@ export function AdminTabs() {
   const pendingCount = usePendingUsersCount(canSeeUsers);
   const canSeeSupport = can('support.read');
   const { counts } = useTicketStats(canSeeSupport);
+  const chatUnread = useChatUnreadBadge(can('chat.use'));
 
   const visible = TABS.filter(
     (tab) =>
@@ -81,7 +85,9 @@ export function AdminTabs() {
               ? pendingCount
               : tab.to === '/admin/support' && (counts?.new ?? 0) > 0
                 ? counts!.new
-                : null;
+                : tab.to === '/admin/chat' && chatUnread > 0
+                  ? chatUnread
+                  : null;
 
           return (
             <NavLink
@@ -105,12 +111,16 @@ export function AdminTabs() {
                     'grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold',
                     tab.to === '/admin/support'
                       ? 'bg-rose-400/90 text-[#1b0505]'
-                      : 'bg-amber-400/90 text-[#1b1205]',
+                      : tab.to === '/admin/chat'
+                        ? 'bg-accent/90 text-[#04110c]'
+                        : 'bg-amber-400/90 text-[#1b1205]',
                   )}
                   title={
                     tab.to === '/admin/support'
                       ? `${badge} новых обращений`
-                      : `${badge} заявок ожидают одобрения`
+                      : tab.to === '/admin/chat'
+                        ? `${badge} непрочитанных сообщений`
+                        : `${badge} заявок ожидают одобрения`
                   }
                 >
                   {badge}
