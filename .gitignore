@@ -13,3 +13,6 @@ server/uploads/*
 Thumbs.db
 .vscode/
 .idea/
+
+# Исходники постеров (локальные картинки, на сайт не идут)
+art/

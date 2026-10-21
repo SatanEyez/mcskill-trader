@@ -26,6 +26,31 @@ export const createRoomSchema = z
   })
   .strict();
 
+export const updateRoomSchema = z
+  .object({
+    name: z
+      .string({ invalid_type_error: 'Название должно быть текстом' })
+      .trim()
+      .min(2, 'Название должно содержать минимум 2 символа')
+      .max(60, 'Название комнаты слишком длинное')
+      .optional(),
+    /** null — убрать аватар, строка — поставить новый. */
+    avatar_url: z
+      .string({ invalid_type_error: 'Ссылка на аватар должна быть текстом' })
+      .trim()
+      .max(512, 'Слишком длинная ссылка на аватар')
+      .refine(
+        (value) => value === '' || value.startsWith('/') || /^https?:\/\//i.test(value),
+        'Ссылка на аватар должна начинаться с / или http(s)://',
+      )
+      .nullable()
+      .optional(),
+  })
+  .strict()
+  .refine((data) => data.name !== undefined || data.avatar_url !== undefined, {
+    message: 'Укажите новое название или аватар',
+  });
+
 export const sendMessageSchema = z
   .object({
     message: z

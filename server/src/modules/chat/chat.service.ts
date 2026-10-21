@@ -12,11 +12,13 @@ import type {
   ChatRoomRow,
   ListMessagesQuery,
   RoomAccess,
+  UpdateRoomInput,
 } from './chat.types.js';
 
 export const CHAT_MESSAGE_MAX_LENGTH = 4000;
 export const CHAT_ROOM_NAME_MAX_LENGTH = 60;
 export const CHAT_MAX_ACCESS_LEVEL = 1000;
+export const CHAT_AVATAR_MAX_LENGTH = 512;
 
 /** Уровень доступа пользователя: чем больше, тем выше должность. */
 const VIEWER_LEVEL_SQL = `
@@ -31,6 +33,7 @@ const VIEWER_LEVEL_SQL = `
 const ROOM_SELECT = `
   SELECT r.id,
          r.name,
+         r.avatar_url,
          r.created_by_login,
          r.created_at,
          r.access_level,
@@ -63,6 +66,7 @@ function toRoomDto(row: ChatRoomRow): ChatRoomDto {
   return {
     id: row.id,
     name: row.name,
+    avatar_url: row.avatar_url ?? null,
     created_by_login: row.created_by_login,
     created_at: toIso(row.created_at),
     access_level: Number(row.access_level ?? 0),
@@ -263,6 +267,7 @@ export async function createRoom(
   const room: ChatRoomDto = {
     id,
     name: trimmed,
+    avatar_url: null,
     created_by_login: actor.login,
     created_at: new Date().toISOString(),
     access_level: accessLevel,
@@ -274,6 +279,94 @@ export async function createRoom(
   emitToAdmins('chat:room', { room });
 
   return room;
+}
+
+/**
+ * Правка комнаты: название и/или аватар (право chat.edit).
+ * Уровни доступа меняются только при создании — это отдельное решение состава.
+ */
+export async function updateRoom(
+  roomId: string,
+  actor: AuthPayload,
+  input: UpdateRoomInput,
+): Promise<ChatRoomDto> {
+  await loadRoomAccess(roomId, actor.sub);
+
+  const db = await getDb();
+  const fields: string[] = [];
+  const params: unknown[] = [];
+
+  if (input.name !== undefined) {
+    const trimmed = input.name.trim();
+
+    if (trimmed.length < 2) {
+      throw new HttpError(422, 'Название должно содержать минимум 2 символа');
+    }
+
+    if (trimmed.length > CHAT_ROOM_NAME_MAX_LENGTH) {
+      throw new HttpError(422, `Название длиннее ${CHAT_ROOM_NAME_MAX_LENGTH} символов`);
+    }
+
+    const duplicate = await db.query<{ id: string }>(
+      'SELECT id FROM chat_rooms WHERE LOWER(name) = LOWER(?) AND id <> ?',
+      [trimmed, roomId],
+    );
+
+    if (duplicate.rows.length > 0) {
+      throw new HttpError(409, 'Комната с таким названием уже существует');
+    }
+
+    fields.push('name = ?');
+    params.push(trimmed);
+  }
+
+  if (input.avatar_url !== undefined) {
+    const avatar = input.avatar_url?.trim() || null;
+
+    if (
+      avatar &&
+      (avatar.length > CHAT_AVATAR_MAX_LENGTH ||
+        (!avatar.startsWith('/') && !/^https?:\/\//i.test(avatar)))
+    ) {
+      throw new HttpError(422, 'Некорректная ссылка на аватар');
+    }
+
+    fields.push('avatar_url = ?');
+    params.push(avatar);
+  }
+
+  if (fields.length === 0) {
+    throw new HttpError(422, 'Нечего менять');
+  }
+
+  params.push(roomId);
+  await db.query(`UPDATE chat_rooms SET ${fields.join(', ')} WHERE id = ?`, params);
+
+  const room = await getRoom(roomId, actor.sub);
+  // В рассылку — только изменённые поля: unread_count и last_message у каждого
+  // зрителя свои, их клиент не должен перезаписывать.
+  emitToAdmins('chat:room-updated', {
+    room_id: room.id,
+    name: room.name,
+    avatar_url: room.avatar_url,
+  });
+
+  return room;
+}
+
+/** Удаление комнаты вместе с перепиской и отметками прочтения (право chat.delete). */
+export async function deleteRoom(roomId: string, actor: AuthPayload): Promise<void> {
+  await loadRoomAccess(roomId, actor.sub);
+
+  const db = await getDb();
+
+  await db.transaction(async (tx) => {
+    await tx.query('DELETE FROM chat_messages WHERE room_id = ?', [roomId]);
+    await tx.query('DELETE FROM chat_reads WHERE room_id = ?', [roomId]);
+    await tx.query('DELETE FROM chat_rooms WHERE id = ?', [roomId]);
+  });
+
+  emitToAdmins('chat:room-deleted', { room_id: roomId });
 }
 
 /** История сообщений: порция «до» указанного времени, от старых к новым. */

@@ -82,7 +82,7 @@ export function clearStoredToken(): void {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   auth?: boolean;
 }
@@ -871,6 +871,31 @@ export async function createChatRoom(
     auth: true,
   });
   return response.data;
+}
+
+/** Правка комнаты: название и/или аватар (право chat.edit). */
+export async function updateChatRoom(
+  roomId: string,
+  input: { name?: string; avatarUrl?: string | null },
+): Promise<ChatRoom> {
+  const body: Record<string, unknown> = {};
+
+  if (input.name !== undefined) body.name = input.name;
+  if (input.avatarUrl !== undefined) body.avatar_url = input.avatarUrl;
+
+  const response = await request<{ data: ChatRoom }>(
+    `/chat/rooms/${encodeURIComponent(roomId)}`,
+    { method: 'PATCH', body, auth: true },
+  );
+  return response.data;
+}
+
+/** Удаление комнаты вместе с перепиской (право chat.delete). */
+export async function deleteChatRoom(roomId: string): Promise<void> {
+  await request<null>(`/chat/rooms/${encodeURIComponent(roomId)}`, {
+    method: 'DELETE',
+    auth: true,
+  });
 }
 
 /** Уровни доступа для формы создания комнаты + собственный уровень пользователя. */

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  Check,
   ImagePlus,
   Loader2,
   Lock,
   MessageSquarePlus,
   MessagesSquare,
+  Pencil,
   Send,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -121,6 +124,8 @@ function MessageBubble({
 export function AdminChatPage() {
   const { user, can } = useAuth();
   const canCreate = can('chat.create');
+  const canEdit = can('chat.edit');
+  const canDelete = can('chat.delete');
   const myLevel = user?.access_level ?? 0;
   const {
     rooms,
@@ -136,6 +141,8 @@ export function AdminChatPage() {
     loadOlder,
     send,
     createRoom,
+    updateRoom,
+    deleteRoom,
     reload,
   } = useChat();
 
@@ -153,6 +160,20 @@ export function AdminChatPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Правка комнаты: название и аватар (право chat.edit).
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState<string | null>(null);
+  const [editUploading, setEditUploading] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Удаление комнаты (право chat.delete). Цель храним отдельно: после удаления
+  // активная комната сбрасывается, а модалке ещё нужно показать её название.
+  const [deleteTarget, setDeleteTarget] = useState<ChatRoom | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const clearAttachment = () => {
     if (attachPreview) URL.revokeObjectURL(attachPreview);
@@ -193,6 +214,7 @@ export function AdminChatPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const nearBottomRef = useRef(true);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null;
@@ -336,6 +358,102 @@ export function AdminChatPage() {
     window.setTimeout(() => inputRef.current?.focus(), 50);
   };
 
+  const openEdit = () => {
+    if (!activeRoom) return;
+
+    setEditName(activeRoom.name);
+    setEditAvatar(activeRoom.avatar_url);
+    setEditError(null);
+    setEditOpen(true);
+  };
+
+  const handleAvatarSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setEditError('Неподдерживаемый формат: нужен PNG, JPG, WebP или GIF');
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setEditError('Файл слишком большой (макс. 5 МБ)');
+      return;
+    }
+
+    setEditUploading(true);
+    setEditError(null);
+
+    try {
+      const uploaded = await uploadImage(file);
+      setEditAvatar(uploaded.url);
+    } catch (uploadFailure) {
+      setEditError(
+        uploadFailure instanceof ApiError
+          ? uploadFailure.message
+          : 'Не удалось загрузить аватар',
+      );
+    } finally {
+      setEditUploading(false);
+    }
+  };
+
+  const handleSaveEdit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!activeRoom || savingEdit || editUploading) return;
+
+    const name = editName.trim();
+
+    if (name.length < 2) {
+      setEditError('Название должно содержать минимум 2 символа');
+      return;
+    }
+
+    const nameChanged = name !== activeRoom.name;
+    const avatarChanged = editAvatar !== activeRoom.avatar_url;
+
+    if (!nameChanged && !avatarChanged) {
+      setEditOpen(false);
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError(null);
+
+    const updated = await updateRoom(activeRoom.id, {
+      ...(nameChanged ? { name } : {}),
+      ...(avatarChanged ? { avatarUrl: editAvatar } : {}),
+    });
+
+    setSavingEdit(false);
+
+    if (!updated) {
+      setEditError('Не удалось сохранить изменения');
+      return;
+    }
+
+    setEditOpen(false);
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!deleteTarget || deleting) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    const ok = await deleteRoom(deleteTarget.id);
+
+    setDeleting(false);
+
+    if (!ok) {
+      setDeleteError('Не удалось удалить комнату');
+      return;
+    }
+
+    setDeleteTarget(null);
+  };
+
   const lastDayRef = useRef<string | null>(null);
 
   return (
@@ -431,7 +549,16 @@ export function AdminChatPage() {
                               room.id === activeRoomId ? 'text-accent' : 'text-slate-200',
                             )}
                           >
-                            <span className="text-slate-500">#</span>
+                            {room.avatar_url ? (
+                              <img
+                                src={room.avatar_url}
+                                alt=""
+                                loading="lazy"
+                                className="h-5 w-5 shrink-0 rounded-md border border-white/10 object-cover"
+                              />
+                            ) : (
+                              <span className="text-slate-500">#</span>
+                            )}
                             <span className="truncate">{room.name}</span>
                             {room.access_level > 0 && (
                               <Lock
@@ -515,9 +642,24 @@ export function AdminChatPage() {
                     >
                       <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
                     </button>
+
+                    {activeRoom.avatar_url ? (
+                      <img
+                        src={activeRoom.avatar_url}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded-lg border border-white/10 object-cover"
+                      />
+                    ) : (
+                      <span
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-sm text-slate-500"
+                        aria-hidden
+                      >
+                        #
+                      </span>
+                    )}
+
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">
-                        <span className="text-slate-500"># </span>
                         {activeRoom.name}
                       </p>
                       <p className="truncate text-[10px] text-slate-500">
@@ -530,6 +672,35 @@ export function AdminChatPage() {
                           : ''}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={openEdit}
+                        className="icon-btn h-7 w-7"
+                        title="Изменить название и аватар"
+                        aria-label="Изменить комнату"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
+
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(activeRoom);
+                        }}
+                        className="icon-btn h-7 w-7 hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-300"
+                        title="Удалить комнату"
+                        aria-label="Удалить комнату"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -794,6 +965,151 @@ export function AdminChatPage() {
           </label>
 
           {createError && <p className="text-[11px] text-rose-300">{createError}</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Настройки комнаты"
+        description="Название и аватар видят все, у кого есть доступ к комнате."
+        size="sm"
+        footer={
+          <>
+            <button type="button" onClick={() => setEditOpen(false)} className="btn btn-ghost">
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveEdit()}
+              disabled={savingEdit || editUploading || editName.trim().length < 2}
+              className="btn btn-primary"
+            >
+              {savingEdit ? <Spinner /> : <Check className="h-4 w-4" aria-hidden />}
+              Сохранить
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-void/60">
+              {editAvatar ? (
+                <img src={editAvatar} alt="Аватар комнаты" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-2xl text-slate-600">#</span>
+              )}
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={editUploading}
+                  className="btn btn-secondary px-3 py-2 text-xs"
+                >
+                  {editUploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <ImagePlus className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  {editAvatar ? 'Заменить' : 'Загрузить'}
+                </button>
+
+                {editAvatar && (
+                  <button
+                    type="button"
+                    onClick={() => setEditAvatar(null)}
+                    disabled={editUploading}
+                    className="btn btn-ghost px-3 py-2 text-xs"
+                  >
+                    Убрать
+                  </button>
+                )}
+              </div>
+
+              <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                PNG, JPG, WebP или GIF до 5 МБ. Квадратная картинка смотрится лучше.
+              </p>
+            </div>
+
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={handleAvatarSelect}
+              className="hidden"
+              aria-label="Файл аватара комнаты"
+            />
+          </div>
+
+          <label className="block">
+            <span className="field-label">Название</span>
+            <input
+              value={editName}
+              onChange={(event) => {
+                setEditName(event.target.value);
+                setEditError(null);
+              }}
+              placeholder="Например, Смена"
+              maxLength={60}
+              className="field"
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  void handleSaveEdit();
+                }
+              }}
+            />
+          </label>
+
+          {editError && <p className="text-[11px] text-rose-300">{editError}</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Удалить комнату?"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              className="btn btn-ghost"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteRoom()}
+              disabled={deleting}
+              className="btn btn-danger"
+            >
+              {deleting ? <Spinner /> : <Trash2 className="h-4 w-4" aria-hidden />}
+              Удалить
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed text-slate-300">
+            Комната{' '}
+            <span className="font-semibold text-white">
+              {deleteTarget?.avatar_url ? '' : '# '}
+              {deleteTarget?.name}
+            </span>{' '}
+            и вся её переписка будут удалены безвозвратно.
+          </p>
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            Сообщения, фото и отметки прочтения исчезнут у всех администраторов. Восстановить их
+            нельзя — если переписка нужна, сохраните её заранее.
+          </p>
+
+          {deleteError && <p className="text-[11px] text-rose-300">{deleteError}</p>}
         </div>
       </Modal>
     </div>

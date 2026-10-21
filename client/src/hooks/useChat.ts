@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ApiError,
   createChatRoom,
+  deleteChatRoom,
   fetchChatMessages,
   fetchChatRooms,
   markChatRoomRead,
   sendChatMessage,
+  updateChatRoom,
 } from '../lib/api';
 import { getChatSocket } from '../lib/chat-socket';
 import { isChatSoundEnabled, playChatSound } from '../lib/chat-sound';
@@ -27,6 +29,17 @@ interface SocketMessagePayload {
 
 interface SocketRoomPayload {
   room?: ChatRoom;
+}
+
+/** Правка комнаты: приходят только изменённые поля. */
+interface SocketRoomUpdatedPayload {
+  room_id?: string;
+  name?: string;
+  avatar_url?: string | null;
+}
+
+interface SocketRoomDeletedPayload {
+  room_id?: string;
 }
 
 function sortRooms(rooms: ChatRoom[]): ChatRoom[] {
@@ -217,6 +230,62 @@ export function useChat() {
     [],
   );
 
+  /** Правка комнаты (название, аватар) — право chat.edit. */
+  const updateRoom = useCallback(
+    async (
+      roomId: string,
+      input: { name?: string; avatarUrl?: string | null },
+    ): Promise<ChatRoom | null> => {
+      try {
+        const room = await updateChatRoom(roomId, input);
+        setRooms((current) =>
+          current.map((item) =>
+            item.id === room.id
+              ? { ...item, name: room.name, avatar_url: room.avatar_url }
+              : item,
+          ),
+        );
+        notifyChatUpdated();
+        return room;
+      } catch (updateError) {
+        setError(
+          updateError instanceof ApiError
+            ? updateError.message
+            : 'Не удалось изменить комнату',
+        );
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Удаление комнаты — право chat.delete. */
+  const deleteRoom = useCallback(
+    async (roomId: string): Promise<boolean> => {
+      try {
+        await deleteChatRoom(roomId);
+        setRooms((current) => current.filter((room) => room.id !== roomId));
+
+        if (activeRoomIdRef.current === roomId) {
+          setActiveRoom(null);
+          setMessages([]);
+          setHasMore(false);
+        }
+
+        notifyChatUpdated();
+        return true;
+      } catch (deleteError) {
+        setError(
+          deleteError instanceof ApiError
+            ? deleteError.message
+            : 'Не удалось удалить комнату',
+        );
+        return false;
+      }
+    },
+    [setActiveRoom],
+  );
+
   // Реалтайм: Socket.io присылает новые сообщения и комнаты.
   useEffect(() => {
     const socket = getChatSocket();
@@ -282,20 +351,58 @@ export function useChat() {
       notifyChatUpdated();
     };
 
+    const onRoomUpdated = (payload: SocketRoomUpdatedPayload) => {
+      const roomId = payload?.room_id;
+      if (!roomId) return;
+
+      setRooms((current) =>
+        current.map((room) =>
+          room.id === roomId
+            ? {
+                ...room,
+                name: payload.name ?? room.name,
+                avatar_url:
+                  payload.avatar_url === undefined ? room.avatar_url : payload.avatar_url,
+              }
+            : room,
+        ),
+      );
+      notifyChatUpdated();
+    };
+
+    const onRoomDeleted = (payload: SocketRoomDeletedPayload) => {
+      const roomId = payload?.room_id;
+      if (!roomId) return;
+
+      setRooms((current) => current.filter((room) => room.id !== roomId));
+
+      if (activeRoomIdRef.current === roomId) {
+        setActiveRoom(null);
+        setMessages([]);
+        setHasMore(false);
+      }
+
+      notifyChatUpdated();
+    };
+
     const onReconnect = () => {
       void loadRooms(true);
     };
 
     socket.on('chat:message', onMessage);
     socket.on('chat:room', onRoom);
+    socket.on('chat:room-updated', onRoomUpdated);
+    socket.on('chat:room-deleted', onRoomDeleted);
     socket.on('connect', onReconnect);
 
     return () => {
       socket.off('chat:message', onMessage);
       socket.off('chat:room', onRoom);
+      socket.off('chat:room-updated', onRoomUpdated);
+      socket.off('chat:room-deleted', onRoomDeleted);
       socket.off('connect', onReconnect);
     };
-  }, [loadRooms, markRead, userId, myLevel]);
+  }, [loadRooms, markRead, setActiveRoom, userId, myLevel]);
 
   // Вернулись на вкладку — дочитываем активную комнату.
   useEffect(() => {
@@ -323,6 +430,8 @@ export function useChat() {
     loadOlder,
     send,
     createRoom,
+    updateRoom,
+    deleteRoom,
     reload: loadRooms,
     setError,
   };

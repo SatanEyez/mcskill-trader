@@ -27,6 +27,12 @@ export const PERMISSIONS = [
   { key: 'presence.view', group: 'Панель', label: 'Список администраторов онлайн' },
   { key: 'chat.use', group: 'Чат', label: 'Служебный чат администраторов' },
   { key: 'chat.create', group: 'Чат', label: 'Создание комнат служебного чата' },
+  {
+    key: 'chat.edit',
+    group: 'Чат',
+    label: 'Изменение комнат: название и аватар',
+  },
+  { key: 'chat.delete', group: 'Чат', label: 'Удаление комнат служебного чата' },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number]['key'];

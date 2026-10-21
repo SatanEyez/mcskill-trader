@@ -1,6 +1,7 @@
 export interface ChatRoomRow {
   id: string;
   name: string;
+  avatar_url: string | null;
   created_by_login: string | null;
   created_at: Date | string;
   access_level: number | string;
@@ -14,6 +15,8 @@ export interface ChatRoomRow {
 export interface ChatRoomDto {
   id: string;
   name: string;
+  /** Аватар комнаты: `/uploads/...` или внешний http(s)-адрес. */
+  avatar_url: string | null;
   created_by_login: string | null;
   created_at: string;
   /** Минимальный уровень доступа, который видит комнату (0 — все с правом chat.use). */
@@ -27,6 +30,12 @@ export interface ChatRoomDto {
     message: string;
     created_at: string;
   } | null;
+}
+
+/** Правка комнаты: название и/или аватар. Незаполненные поля не меняются. */
+export interface UpdateRoomInput {
+  name?: string;
+  avatar_url?: string | null;
 }
 
 /** Уровень доступа роли и подпись для выбора в интерфейсе. */
