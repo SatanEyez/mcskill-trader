@@ -52,6 +52,9 @@ export function CoinInput({ value, onChange, className }: CoinInputProps) {
     setText(value > 0 ? formatPriceDots(value) : '');
   };
 
+  // Длинную сумму показываем мельче, чтобы она влезала в поле целиком.
+  const fontPx = text.length > 20 ? 10 : text.length > 17 ? 11 : text.length > 13 ? 12 : 14;
+
   return (
     <div
       className={clsx(
@@ -92,7 +95,8 @@ export function CoinInput({ value, onChange, className }: CoinInputProps) {
           setText(next);
           onChange(parseCoinsInput(next));
         }}
-        className="min-w-0 flex-1 bg-transparent text-right font-display text-sm font-semibold text-white outline-none placeholder:font-sans placeholder:text-slate-600"
+        className="min-w-0 flex-1 bg-transparent text-right font-display font-semibold leading-none text-white outline-none placeholder:font-sans placeholder:text-slate-600"
+        style={{ fontSize: `${fontPx}px` }}
       />
 
       {value > 0 && (

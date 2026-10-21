@@ -4,8 +4,9 @@ import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { categoryStyle } from '../../lib/constants';
 import { readableNameColor } from '../../lib/color';
-import { amountDigitCount, formatPriceDots } from '../../lib/format';
+import { formatPriceDots } from '../../lib/format';
 import { MAX_TRADE_QUANTITY, clampQuantity } from '../../lib/trade';
+import { AutoFitText } from '../ui/AutoFitText';
 import { ItemImage } from '../ui/ItemImage';
 
 interface TradeItemRowProps {
@@ -23,7 +24,7 @@ export function TradeItemRow({ resource, quantity, onChange, onRemove }: TradeIt
   }, [quantity]);
 
   const lineTotal = resource.min_price * quantity;
-  const totalHuge = amountDigitCount(lineTotal) > 18;
+  const lineTotalText = formatPriceDots(lineTotal);
 
   const commitDraft = () => {
     const parsed = Number(draft);
@@ -71,7 +72,7 @@ export function TradeItemRow({ resource, quantity, onChange, onRemove }: TradeIt
         <button
           type="button"
           onClick={onRemove}
-          className="icon-btn -mr-1 -mt-1 h-7 w-7 shrink-0 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
+          className="icon-btn -mt-1 h-7 w-7 shrink-0 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
           title={`Убрать «${resource.name}»`}
           aria-label={`Убрать ${resource.name} из списка`}
         >
@@ -136,15 +137,17 @@ export function TradeItemRow({ resource, quantity, onChange, onRemove }: TradeIt
           </button>
         </div>
 
-        <span
-          className={
-            totalHuge
-              ? 'mt-0.5 w-full whitespace-nowrap text-right font-display text-[11px] font-semibold text-accent-300'
-              : 'ml-auto shrink-0 whitespace-nowrap text-right font-display text-xs font-semibold text-accent-300'
-          }
-        >
-          {formatPriceDots(lineTotal)}
-        </span>
+        {/* Сумма строки — на своей строке: так длинные числа получают всю ширину карточки. */}
+        <div className="w-full min-w-0">
+          <AutoFitText
+            max={12}
+            min={6}
+            className="text-right font-display text-xs font-semibold text-accent-300"
+            title={`${lineTotalText} монет`}
+          >
+            {lineTotalText}
+          </AutoFitText>
+        </div>
       </div>
     </li>
   );

@@ -1,9 +1,10 @@
-import { useId, useMemo } from 'react';
+﻿import { useId, useMemo } from 'react';
 import { PackageOpen, Plus, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Resource } from '../../types';
-import { amountDigitCount, formatPriceDots, formatQuantityLabel } from '../../lib/format';
+import { formatPriceDots, formatQuantityLabel } from '../../lib/format';
 import { MAX_TRADE_LINES, type TradeLine } from '../../lib/trade';
+import { AutoFitText } from '../ui/AutoFitText';
 import { CoinInput } from './CoinInput';
 import { TradeItemRow } from './TradeItemRow';
 
@@ -59,15 +60,6 @@ export function TradeSide({
   const titleId = useId();
   const styles = TONE_STYLES[tone];
   const atLimit = lines.length >= MAX_TRADE_LINES;
-  const totalDigits = amountDigitCount(total);
-  const totalSize =
-    totalDigits > 25
-      ? 'text-sm'
-      : totalDigits > 21
-        ? 'text-base'
-        : totalDigits > 15
-          ? 'text-xl'
-          : 'text-2xl';
 
   const resourcesById = useMemo(
     () => new Map(resources.map((resource) => [resource.id, resource])),
@@ -98,15 +90,20 @@ export function TradeSide({
       </div>
 
       <div className="mt-3 border-b border-white/[0.05] pb-3">
-        <div className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-          <span className={`font-display font-semibold text-white ${totalSize}`}>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <AutoFitText
+            max={24}
+            min={8}
+            className="min-w-0 flex-1 font-display font-semibold text-white"
+            title={`${formatPriceDots(total)} монет`}
+          >
             {formatPriceDots(total)}
-          </span>
-          <span className="text-[11px] text-slate-500">монет</span>
+          </AutoFitText>
+          <span className="shrink-0 text-[11px] text-slate-500">монет</span>
         </div>
 
         {coins > 0 && lines.length > 0 && (
-          <p className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap text-[10px] text-slate-500">
+          <p className="mt-1 flex flex-wrap items-center justify-end gap-x-1 text-[10px] text-slate-500">
             <span>предметы {formatPriceDots(itemsTotal)}</span>
             <span className="text-slate-600">+</span>
             <span className="text-amber-200/80">{formatPriceDots(coins)}</span>
@@ -114,7 +111,7 @@ export function TradeSide({
         )}
 
         {totalQuantity > 0 && (
-          <p className="mt-1 text-right text-[10px] text-slate-500 whitespace-nowrap">
+          <p className="mt-1 text-right text-[10px] text-slate-500">
             {formatQuantityLabel(totalQuantity)}
           </p>
         )}

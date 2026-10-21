@@ -1,7 +1,8 @@
 import { Calculator, Scale, ShieldAlert, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { TradeCalculationResult } from '../../types';
-import { amountDigitCount, formatPriceDots, formatQuantityLabel } from '../../lib/format';
+import { formatPriceDots, formatQuantityLabel } from '../../lib/format';
+import { AutoFitText } from '../ui/AutoFitText';
 
 interface TradeSummaryProps {
   result: TradeCalculationResult;
@@ -42,28 +43,6 @@ export function TradeSummary({
 }: TradeSummaryProps) {
   const { side_a: sideA, side_b: sideB, delta } = result;
 
-  const valueSize = (value: number): string => {
-    const digits = amountDigitCount(value);
-    return digits > 25
-      ? 'text-[9px]'
-      : digits > 21
-        ? 'text-[10px]'
-        : digits > 15
-          ? 'text-[11px]'
-          : '';
-  };
-  const deltaDigits = amountDigitCount(delta);
-  const deltaSize =
-    deltaDigits > 25
-      ? 'text-[9px]'
-      : deltaDigits > 21
-        ? 'text-xs'
-        : deltaDigits > 15
-          ? 'text-sm'
-          : 'text-lg';
-  const hugeA = amountDigitCount(sideA.total) > 25;
-  const hugeB = amountDigitCount(sideB.total) > 25;
-
   const tone: Tone = !hasContent
     ? 'neutral'
     : delta === 0
@@ -103,13 +82,16 @@ export function TradeSummary({
 
       <div className="mt-4 space-y-3 text-xs">
         <div>
-          <div className={`flex items-start justify-between gap-2 ${hugeA ? 'flex-wrap' : ''}`}>
+          <div className="flex items-baseline justify-between gap-2">
             <span className="shrink-0 text-slate-500">Я отдаю</span>
-            <span
-              className={`min-w-0 whitespace-nowrap text-right font-semibold text-slate-200 ${hugeA ? 'w-full' : ''} ${valueSize(sideA.total)}`}
+            <AutoFitText
+              max={13}
+              min={6}
+              className="min-w-0 flex-1 text-right font-semibold text-slate-200"
+              title={`${formatPriceDots(sideA.total)} монет`}
             >
               {formatPriceDots(sideA.total)}
-            </span>
+            </AutoFitText>
           </div>
           {sideA.items_count > 0 && (
             <p className="mt-0.5 whitespace-nowrap text-right text-[9px] text-slate-500">
@@ -124,13 +106,16 @@ export function TradeSummary({
         </div>
 
         <div>
-          <div className={`flex items-start justify-between gap-2 ${hugeB ? 'flex-wrap' : ''}`}>
+          <div className="flex items-baseline justify-between gap-2">
             <span className="shrink-0 text-slate-500">Я получаю</span>
-            <span
-              className={`min-w-0 whitespace-nowrap text-right font-semibold text-slate-200 ${hugeB ? 'w-full' : ''} ${valueSize(sideB.total)}`}
+            <AutoFitText
+              max={13}
+              min={6}
+              className="min-w-0 flex-1 text-right font-semibold text-slate-200"
+              title={`${formatPriceDots(sideB.total)} монет`}
             >
               {formatPriceDots(sideB.total)}
-            </span>
+            </AutoFitText>
           </div>
           {sideB.items_count > 0 && (
             <p className="mt-0.5 whitespace-nowrap text-right text-[9px] text-slate-500">
@@ -159,12 +144,17 @@ export function TradeSummary({
         <p className="mt-1 font-display text-base font-semibold text-white">{title}</p>
 
         {hasContent && delta !== 0 && (
-          <p className={`mt-1 whitespace-nowrap font-display font-bold leading-tight ${deltaSize}`}>
+          <AutoFitText
+            max={18}
+            min={5}
+            className="mt-1 font-display font-bold leading-tight"
+            title={`${formatPriceDots(Math.abs(delta))} монет`}
+          >
             {formatPriceDots(Math.abs(delta))}
-            <span className="ml-1 font-sans text-[10px] font-medium uppercase tracking-wider opacity-80">
+            <span className="ml-1 font-sans text-[0.62em] font-medium uppercase tracking-wider opacity-80">
               монет
             </span>
-          </p>
+          </AutoFitText>
         )}
 
         <p className="mt-2 text-[10px] leading-relaxed opacity-90">{hint}</p>
