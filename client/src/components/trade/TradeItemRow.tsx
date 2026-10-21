@@ -42,8 +42,8 @@ export function TradeItemRow({ resource, quantity, onChange, onRemove }: TradeIt
   return (
     <li className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5 transition hover:border-white/[0.1]">
       <div className="flex items-start gap-2.5">
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
-          <ItemImage src={resource.image_url} alt={resource.name} className="h-full w-full" />
+        <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
+          <ItemImage src={resource.image_url} alt={resource.name} className="h-16 w-16" />
         </span>
 
         <div className="min-w-0 flex-1">

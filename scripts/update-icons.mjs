@@ -22,8 +22,11 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');
 const ICON_DIR = join(repoRoot, 'server', 'uploads', 'prices');
 const ICON_URL = '/uploads/prices';
-/** Метка версии в image_url: меняется при каждой пачке новых иконок. */
-const ICON_VERSION = '3d2';
+/**
+ * Метка версии в image_url: меняется при каждой пачке новых иконок.
+ * `3d3` — после снятия premultiplied alpha (scripts/fix-premultiplied-icons.mjs).
+ */
+const ICON_VERSION = '3d3';
 
 function readEnvFile(path) {
   const values = {};

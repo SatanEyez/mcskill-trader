@@ -20,6 +20,7 @@ import {
   removeLine,
   saveTradeState,
   setLineQuantity,
+  toggleLine,
   type TradeSide as TradeSideKey,
   type TradeState,
 } from '../lib/trade';
@@ -138,7 +139,9 @@ export function TradePage() {
   const handlePick = useCallback(
     (resource: Resource) => {
       if (!pickerSide) return;
-      updateSide(pickerSide, (lines) => addLine(lines, resource.id));
+      // Повторное нажатие по уже выбранной строке снимает выбор.
+      setAlignNote(null);
+      updateSide(pickerSide, (lines) => toggleLine(lines, resource.id));
     },
     [pickerSide, updateSide],
   );

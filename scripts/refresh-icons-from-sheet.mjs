@@ -29,8 +29,8 @@ const ICON_URL = '/uploads/prices';
 const CELL = 32;
 /** Метка версии для пересобранных 2D-иконок (у 3D — `3d`). */
 const ICON_VERSION = '2d2';
-/** Метка, которой помечены иконки из 3D-пакета. */
-const KEEP_VERSION = '3d2';
+/** Метки, которыми помечены иконки из 3D-пакета: их 2D-нарезка не перезаписывает. */
+const KEEP_VERSIONS = ['3d2', '3d3'];
 
 function readEnvFile(path) {
   const values = {};
@@ -170,7 +170,10 @@ async function main() {
   const plan = [];
 
   for (const row of rows) {
-    if ((row.image_url ?? '').includes(`v=${KEEP_VERSION}`)) { stats.skipped3d += 1; continue; }
+    if (KEEP_VERSIONS.some((version) => (row.image_url ?? '').includes(`v=${version}`))) {
+      stats.skipped3d += 1;
+      continue;
+    }
 
     const index = indexByKey.get(row.source_key);
     if (index === undefined) { stats.noIndex += 1; continue; }

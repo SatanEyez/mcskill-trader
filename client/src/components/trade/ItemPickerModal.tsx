@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, PackageSearch, Plus, Search, Store } from 'lucide-react';
+import { Check, PackageSearch, Plus, Search, Store, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { UNCATEGORIZED_LABEL } from '../../lib/constants';
@@ -85,7 +85,7 @@ export function ItemPickerModal({
       open={open}
       onClose={onClose}
       title="Добавить предмет"
-      description={`Сторона «${sideTitle}». Повторный выбор увеличит количество.`}
+      description={`Сторона «${sideTitle}». Нажмите на предмет, чтобы добавить его, и ещё раз — чтобы убрать.`}
       size="lg"
       footer={
         <>
@@ -166,7 +166,7 @@ export function ItemPickerModal({
                     onClick={() => onPick(resource)}
                     disabled={disabled}
                     className={clsx(
-                      'flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition',
+                      'group flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition',
                       inSide
                         ? 'border-accent/25 bg-accent/[0.06]'
                         : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]',
@@ -176,12 +176,13 @@ export function ItemPickerModal({
                       disabled
                         ? `Лимит ${MAX_TRADE_LINES} предметов на сторону`
                         : inSide
-                          ? 'Увеличить количество на 1'
+                          ? 'Убрать предмет из сделки'
                           : 'Добавить предмет'
                     }
+                    aria-pressed={inSide}
                   >
-                    <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
-                      <ItemImage src={resource.image_url} alt="" className="h-full w-full" />
+                    <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
+                      <ItemImage src={resource.image_url} alt="" className="h-16 w-16" />
                     </span>
 
                     <span className="min-w-0 flex-1">
@@ -214,7 +215,15 @@ export function ItemPickerModal({
                       )}
                       aria-hidden
                     >
-                      {inSide ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                      {inSide ? (
+                        <>
+                          {/* Наведение подсказывает, что второе нажатие уберёт предмет. */}
+                          <Check className="h-3.5 w-3.5 group-hover:hidden" />
+                          <X className="hidden h-3.5 w-3.5 group-hover:block" />
+                        </>
+                      ) : (
+                        <Plus className="h-3.5 w-3.5" />
+                      )}
                     </span>
                   </button>
                 </li>

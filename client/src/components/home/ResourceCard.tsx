@@ -29,8 +29,14 @@ export function ResourceCard({ resource, onUse }: ResourceCardProps) {
       />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.07] to-transparent p-2 transition group-hover:border-accent/20">
-          <ItemImage src={resource.image_url} alt={resource.name} className="h-full w-full" />
+        {/*
+          Плитка 80px с p-2 даёт внутренние 64px: иконки каталога бывают
+          32×32 (нарезка из спрайт-листа) и 64×64 (3D-пакет). При 64px
+          они ложатся ровно в 2× и 1×, поэтому пиксель-арт остаётся чётким;
+          при 48px получался нецелый масштаб 1,5× и «рваные» пиксели.
+        */}
+        <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.07] to-transparent transition group-hover:border-accent/20">
+          <ItemImage src={resource.image_url} alt={resource.name} className="h-16 w-16" />
         </span>
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">

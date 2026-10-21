@@ -78,6 +78,17 @@ export function removeLine(lines: TradeLine[], resourceId: string): TradeLine[] 
   return lines.filter((line) => line.resourceId !== resourceId);
 }
 
+/**
+ * Переключает предмет в стороне: если его ещё нет — добавляет,
+ * если уже есть — убирает целиком.
+ * Нужно для списка выбора: второе нажатие по выбранной строке снимает выбор.
+ */
+export function toggleLine(lines: TradeLine[], resourceId: string): TradeLine[] {
+  return lines.some((line) => line.resourceId === resourceId)
+    ? removeLine(lines, resourceId)
+    : addLine(lines, resourceId);
+}
+
 function calculateSide(
   lines: TradeLine[],
   resourcesById: Map<string, Resource>,
