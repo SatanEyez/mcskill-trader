@@ -33,6 +33,12 @@ const allowedOrigins = env.CLIENT_ORIGIN.split(',').map((origin) => origin.trim(
 export function createApp(): Express {
   const app = express();
 
+  // Render (и любой другой reverse-proxy) терминирует TLS и добавляет
+  // X-Forwarded-For. Без этого req.ip — адрес самого прокси, поэтому
+  // express-rate-limit считал бы всех посетителей одним клиентом и общий
+  // лимит в 20 неудачных входов блокировал бы вход всем сразу.
+  if (isProduction) app.set('trust proxy', 1);
+
   app.disable('x-powered-by');
   app.use(
     helmet({
