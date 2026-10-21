@@ -221,7 +221,7 @@ Render сам подставит сборку, старт, health-check (`/api/h
 
 Важно:
 
-- `NODE_ENV=production` отключает devDependencies, поэтому в build-команде нужен `--include=dev`: иначе не будет `tsc` и `vite`.
+- `NODE_ENV=production` отключает devDependencies, поэтому в build-команде нужен `--include=dev`: иначе не будет `tsc` и `vite`. В репозитории уже лежит `.npmrc` с `include=dev`, так что сборка не зависит от того, как именно вызван npm (`npm ci`, `npm install`).
 - Миграции применяются автоматически при старте API; повторный деплой их не ломает.
 - В TiDB Cloud должен быть разрешён доступ с адресов Render (IP Access List → `0.0.0.0/0`), иначе API не подключится к базе.
 - Клиент собирается в `client/dist` и раздаётся тем же сервером, поэтому CORS и отдельный фронтенд не нужны.
