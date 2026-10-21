@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { fetchTicketStats } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { TicketCounts } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 interface UseTicketStatsResult {
   counts: TicketCounts | null;
@@ -9,25 +11,27 @@ interface UseTicketStatsResult {
 
 /** Счётчики обращений для бейджа в админ-навигации. */
 export function useTicketStats(enabled = true): UseTicketStatsResult {
-  const [counts, setCounts] = useState<TicketCounts | null>(null);
-
-  const reload = useCallback(async () => {
-    if (!enabled) return;
-
-    try {
-      setCounts(await fetchTicketStats());
-    } catch {
-      // Бейдж не критичен: молча оставляем прошлое значение.
-    }
-  }, [enabled]);
+  const { data, reload } = useCachedFetch(QK.ticketStats, fetchTicketStats, {
+    enabled,
+    ttl: 30_000,
+  });
 
   useEffect(() => {
-    void reload();
-
     if (!enabled) return;
-    const timer = window.setInterval(() => void reload(), 60_000);
+
+    const timer = window.setInterval(() => {
+      void reload({ silent: true }).catch(() => {
+        // Бейдж не критичен: молча оставляем прошлое значение.
+      });
+    }, 60_000);
+
     return () => window.clearInterval(timer);
   }, [enabled, reload]);
 
-  return { counts, reload };
+  return {
+    counts: data ?? null,
+    reload: async () => {
+      await reload({ silent: true });
+    },
+  };
 }

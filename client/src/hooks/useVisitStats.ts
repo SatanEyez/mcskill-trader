@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
 import { fetchVisitStats } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { VisitPeriod, VisitStats } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 interface UseVisitStatsResult {
   stats: VisitStats | null;
@@ -11,26 +12,11 @@ interface UseVisitStatsResult {
 
 /** Сводка посещений за выбранный период. */
 export function useVisitStats(period: VisitPeriod): UseVisitStatsResult {
-  const [stats, setStats] = useState<VisitStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, reload } = useCachedFetch(
+    QK.visitStats(period),
+    () => fetchVisitStats(period),
+    { ttl: 60_000 },
+  );
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-
-    try {
-      setStats(await fetchVisitStats(period));
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить статистику');
-    } finally {
-      setLoading(false);
-    }
-  }, [period]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { stats, loading, error, reload };
+  return { stats: data ?? null, loading, error, reload };
 }

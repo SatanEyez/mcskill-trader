@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Eye,
@@ -20,6 +20,8 @@ import {
   uploadImage,
 } from '../lib/api';
 import { useToast } from '../context/ToastContext';
+import { useCachedFetch } from '../hooks/useCachedFetch';
+import { QK } from '../lib/query-keys';
 import { formatDateTimeMsk, pluralize } from '../lib/format';
 import type { NewsPost } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
@@ -50,11 +52,28 @@ export function AdminNewsPage() {
   const { notify } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [posts, setPosts] = useState<NewsPost[]>([]);
-  const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Список идёт через кэш: возврат на вкладку не перезагружает новости.
+  const {
+    data: newsPage,
+    loading,
+    error: loadError,
+    reload,
+  } = useCachedFetch(QK.allNews(PAGE_SIZE, offset), () =>
+    fetchAllNews({ limit: PAGE_SIZE, offset }),
+  );
+
+  const posts = newsPage?.data ?? [];
+  const total = newsPage?.meta.total ?? 0;
+  const error = loadError;
+
+  const load = useCallback(
+    async (silent = false) => {
+      await reload({ silent });
+    },
+    [reload],
+  );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,28 +84,6 @@ export function AdminNewsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<NewsPost | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-
-  const load = useCallback(
-    async (silent = false) => {
-      if (!silent) setLoading(true);
-
-      try {
-        const response = await fetchAllNews({ limit: PAGE_SIZE, offset });
-        setPosts(response.data);
-        setTotal(response.meta.total);
-        setError(null);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить новости');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [offset],
-  );
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const openCreate = () => {
     setEditingId(null);

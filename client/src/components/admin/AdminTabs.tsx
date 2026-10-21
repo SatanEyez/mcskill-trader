@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useEffect } from 'react';
 import { LayoutGrid } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +7,7 @@ import { usePendingUsersCount } from '../../hooks/useAdminUsers';
 import { useChatUnreadBadge } from '../../hooks/useChat';
 import { useTicketStats } from '../../hooks/useTicketStats';
 import { ADMIN_SECTIONS, canOpenSection } from '../../lib/admin-sections';
+import { prefetchRoute, warmRoutes } from '../../lib/prefetch';
 
 export function AdminTabs() {
   const { can } = useAuth();
@@ -16,6 +18,12 @@ export function AdminTabs() {
   const { counts } = useTicketStats(canSeeSupport);
   const chatUnread = useChatUnreadBadge(can('chat.use'));
 
+  // Пока админ смотрит на текущую вкладку, тихо тянем данные соседних:
+  // к переходу они уже в кэше.
+  useEffect(() => {
+    warmRoutes();
+  }, []);
+
   const visibleTabs = ADMIN_SECTIONS.filter((section) => section.inTabs && canOpenSection(section, can));
 
   return (
@@ -25,6 +33,8 @@ export function AdminTabs() {
             Видна любому администратору: это точка входа в остальные разделы. */}
         <NavLink
           to="/admin/panel"
+          onMouseEnter={() => prefetchRoute('/admin/panel')}
+          onFocus={() => prefetchRoute('/admin/panel')}
           className={({ isActive }) =>
             clsx(
               'group relative flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition',
@@ -58,6 +68,8 @@ export function AdminTabs() {
               key={tab.to}
               to={tab.to}
               end={tab.end}
+              onMouseEnter={() => prefetchRoute(tab.to)}
+              onFocus={() => prefetchRoute(tab.to)}
               className={({ isActive }) =>
                 clsx(
                   'relative flex shrink-0 items-center gap-2 px-3 py-3 text-sm font-medium transition',

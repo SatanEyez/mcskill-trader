@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAuditLogs } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { AuditGroup, AuditLogEntry, AuditPeriod } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 const PAGE_SIZE = 50;
 
@@ -22,57 +24,36 @@ interface UseAuditLogsResult {
   loadMore: () => Promise<void>;
 }
 
+/**
+ * Журнал действий. Первая страница кэшируется по фильтрам — возврат на
+ * вкладку с теми же фильтрами открывается сразу. Догрузка «ещё» идёт мимо
+ * кэша и просто дописывается в конец списка.
+ */
 export function useAuditLogs(filters: AuditFilters): UseAuditLogsResult {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-
   const { group, period, userId, search } = filters;
 
-  const reload = useCallback(
-    async (options?: { silent?: boolean }) => {
-      const currentRequest = ++requestId.current;
-
-      if (!options?.silent) setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetchAuditLogs({
-          group,
-          period,
-          userId,
-          search,
-          limit: PAGE_SIZE,
-          offset: 0,
-        });
-
-        if (currentRequest !== requestId.current) return;
-        setEntries(response.data);
-        setTotal(response.meta.total);
-      } catch (requestError) {
-        if (currentRequest !== requestId.current) return;
-        setError(
-          requestError instanceof Error ? requestError.message : 'Не удалось загрузить журнал',
-        );
-      } finally {
-        if (currentRequest === requestId.current) setLoading(false);
-      }
-    },
-    [group, period, userId, search],
+  const { data, loading, error, reload } = useCachedFetch(
+    QK.auditLogs({ group, period, userId, search, limit: PAGE_SIZE }),
+    () => fetchAuditLogs({ group, period, userId, search, limit: PAGE_SIZE, offset: 0 }),
   );
 
+  const [extra, setExtra] = useState<AuditLogEntry[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const requestId = useRef(0);
+
+  // Сменились фильтры — догруженные страницы больше не относятся к делу.
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    setExtra([]);
+  }, [group, period, userId, search]);
+
+  const entries = data ? [...data.data, ...extra] : extra;
+  const total = data?.meta.total ?? 0;
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore) return;
 
     setLoadingMore(true);
-    const currentRequest = requestId.current;
+    const currentRequest = ++requestId.current;
 
     try {
       const response = await fetchAuditLogs({
@@ -85,14 +66,9 @@ export function useAuditLogs(filters: AuditFilters): UseAuditLogsResult {
       });
 
       if (currentRequest !== requestId.current) return;
-      setEntries((current) => [...current, ...response.data]);
-      setTotal(response.meta.total);
-    } catch (requestError) {
-      if (currentRequest === requestId.current) {
-        setError(
-          requestError instanceof Error ? requestError.message : 'Не удалось загрузить журнал',
-        );
-      }
+      setExtra((current) => [...current, ...response.data]);
+    } catch {
+      // Ошибку догрузки не показываем отдельно: основной список уже на экране.
     } finally {
       setLoadingMore(false);
     }

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchResources } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { Resource } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 interface UseResourcesResult {
   resources: Resource[];
@@ -14,34 +15,9 @@ interface UseResourcesResult {
  * на клиенте — это даёт мгновенный отклик без запросов на каждый символ.
  */
 export function useResources(): UseResourcesResult {
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
+  const { data, loading, error, reload } = useCachedFetch(QK.resources('name_asc'), () =>
+    fetchResources({ sort: 'name_asc' }),
+  );
 
-  const reload = useCallback(async (options?: { silent?: boolean }) => {
-    const currentRequest = ++requestId.current;
-
-    if (!options?.silent) setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetchResources({ sort: 'name_asc' });
-      if (currentRequest !== requestId.current) return;
-      setResources(response.data);
-    } catch (requestError) {
-      if (currentRequest !== requestId.current) return;
-      setError(
-        requestError instanceof Error ? requestError.message : 'Не удалось загрузить ресурсы',
-      );
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { resources, loading, error, reload };
+  return { resources: data?.data ?? [], loading, error, reload };
 }

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchUsers } from '../lib/api';
+import { QK } from '../lib/query-keys';
+import { readCache, cacheAge, writeCache } from '../lib/query-cache';
 import type { AdminStatus, AdminUser, AdminUserCounts } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 const EMPTY_COUNTS: AdminUserCounts = { total: 0, pending: 0, approved: 0, rejected: 0 };
 
@@ -20,48 +23,25 @@ interface UseAdminUsersResult {
 }
 
 export function useAdminUsers(status: AdminStatus | 'all' = 'all'): UseAdminUsersResult {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [counts, setCounts] = useState<AdminUserCounts>(EMPTY_COUNTS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-
-  const reload = useCallback(
-    async (options?: { silent?: boolean }) => {
-      const currentRequest = ++requestId.current;
-
-      if (!options?.silent) setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetchUsers(status);
-        if (currentRequest !== requestId.current) return;
-        setUsers(response.data);
-        setCounts(response.meta);
-      } catch (requestError) {
-        if (currentRequest !== requestId.current) return;
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'Не удалось загрузить администраторов',
-        );
-      } finally {
-        if (currentRequest === requestId.current) setLoading(false);
-      }
-    },
-    [status],
+  const { data, loading, error, reload } = useCachedFetch(QK.users(status), () =>
+    fetchUsers(status),
   );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { users, counts, loading, error, reload };
+  return {
+    users: data?.data ?? [],
+    counts: data?.meta ?? EMPTY_COUNTS,
+    loading,
+    error,
+    reload,
+  };
 }
 
 /** Количество заявок, ожидающих одобрения — для бейджа во вкладке. */
 export function usePendingUsersCount(enabled = true): number {
-  const [count, setCount] = useState(0);
+  // Стартуем с прошлого значения из кэша: бейдж не должен «прыгать» с нуля.
+  const [count, setCount] = useState(
+    () => readCache<{ data: AdminUser[]; meta: AdminUserCounts }>(QK.users('pending'))?.meta.pending ?? 0,
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -74,6 +54,7 @@ export function usePendingUsersCount(enabled = true): number {
     const load = () => {
       fetchUsers('pending')
         .then((response) => {
+          writeCache(QK.users('pending'), response);
           if (active) setCount(response.meta.pending);
         })
         .catch(() => {
@@ -81,7 +62,11 @@ export function usePendingUsersCount(enabled = true): number {
         });
     };
 
-    load();
+    // При быстрых переходах между вкладками не дёргаем сеть повторно:
+    // счётчик заявок меняется не чаще, чем раз в несколько секунд.
+    const age = cacheAge(QK.users('pending'));
+    if (age === null || age > 20_000) load();
+
     window.addEventListener(USERS_CHANGED_EVENT, load);
 
     return () => {

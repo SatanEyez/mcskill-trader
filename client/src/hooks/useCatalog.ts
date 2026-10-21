@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchCatalog } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { Resource } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 interface UseCatalogResult {
   resources: Resource[];
@@ -15,35 +16,10 @@ interface UseCatalogResult {
  * хранятся в localStorage и могут ссылаться на любую страницу каталога.
  */
 export function useCatalog(): UseCatalogResult {
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
+  const { data, loading, error, reload } = useCachedFetch(QK.catalog, fetchCatalog, {
+    // Каталог меняется реже, чем каталог-лента: держим его дольше.
+    ttl: 5 * 60_000,
+  });
 
-  const reload = useCallback(async () => {
-    const currentRequest = ++requestId.current;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await fetchCatalog();
-      if (currentRequest !== requestId.current) return;
-      setResources(data);
-    } catch (requestError) {
-      if (currentRequest !== requestId.current) return;
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Не удалось загрузить каталог',
-      );
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { resources, loading, error, reload };
+  return { resources: data ?? [], loading, error, reload };
 }

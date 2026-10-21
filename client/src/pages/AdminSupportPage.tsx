@@ -10,20 +10,12 @@ import {
   UserRound,
 } from 'lucide-react';
 import clsx from 'clsx';
-import {
-  ApiError,
-  fetchTickets,
-  fetchTicketStats,
-  updateTicket,
-} from '../lib/api';
+import { ApiError, fetchTickets, fetchTicketStats, updateTicket } from '../lib/api';
 import { useToast } from '../context/ToastContext';
+import { useCachedFetch } from '../hooks/useCachedFetch';
+import { QK } from '../lib/query-keys';
 import { formatDateTimeMsk, pluralize } from '../lib/format';
-import type {
-  SupportTicket,
-  TicketCounts,
-  TicketKind,
-  TicketStatus,
-} from '../types';
+import type { SupportTicket, TicketKind, TicketStatus } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
@@ -75,11 +67,24 @@ export function AdminSupportPage() {
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
 
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState<TicketCounts | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Список и счётчики кэшируются вместе: возврат на вкладку рисуется сразу.
+  const {
+    data: ticketPage,
+    loading,
+    error,
+    reload,
+  } = useCachedFetch(QK.tickets({ status, kind, search, limit: PAGE_SIZE, offset }), async () => {
+    const [list, stats] = await Promise.all([
+      fetchTickets({ status, kind, search, limit: PAGE_SIZE, offset }),
+      fetchTicketStats(),
+    ]);
+
+    return { list, stats };
+  });
+
+  const tickets = ticketPage?.list.data ?? [];
+  const total = ticketPage?.list.meta.total ?? 0;
+  const counts = ticketPage?.stats ?? null;
 
   const [selected, setSelected] = useState<SupportTicket | null>(null);
   const [reply, setReply] = useState('');
@@ -88,33 +93,10 @@ export function AdminSupportPage() {
 
   const load = useCallback(
     async (silent = false) => {
-      if (!silent) setLoading(true);
-      setError(null);
-
-      try {
-        const [list, stats] = await Promise.all([
-          fetchTickets({ status, kind, search, limit: PAGE_SIZE, offset }),
-          fetchTicketStats(),
-        ]);
-        setTickets(list.data);
-        setTotal(list.meta.total);
-        setCounts(stats);
-      } catch (requestError) {
-        setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : 'Не удалось загрузить обращения',
-        );
-      } finally {
-        setLoading(false);
-      }
+      await reload({ silent });
     },
-    [status, kind, search, offset],
+    [reload],
   );
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   useEffect(() => {
     const previousTitle = document.title;

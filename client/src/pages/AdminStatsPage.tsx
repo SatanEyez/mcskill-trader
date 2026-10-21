@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   AlertTriangle,
   BarChart3,
@@ -10,10 +10,12 @@ import {
   Users,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { ApiError, fetchVisitors } from '../lib/api';
+import { fetchVisitors } from '../lib/api';
 import { formatDateMsk, formatDateTimeMsk, pluralize } from '../lib/format';
 import { useVisitStats } from '../hooks/useVisitStats';
-import type { VisitPeriod, VisitorEntry } from '../types';
+import { useCachedFetch } from '../hooks/useCachedFetch';
+import { QK } from '../lib/query-keys';
+import type { VisitPeriod } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { PageLoader } from '../components/ui/Spinner';
@@ -55,33 +57,21 @@ export function AdminStatsPage() {
   const [period, setPeriod] = useState<VisitPeriod>('7d');
   const { stats, loading, error, reload } = useVisitStats(period);
 
-  const [visitors, setVisitors] = useState<VisitorEntry[]>([]);
-  const [visitorsError, setVisitorsError] = useState<string | null>(null);
-  const [visitorsLoading, setVisitorsLoading] = useState(true);
+  // Посетители тоже кэшируются: возврат на вкладку не мигает скелетоном.
+  const {
+    data: visitorsPage,
+    loading: visitorsLoading,
+    error: visitorsError,
+    reload: reloadVisitors,
+  } = useCachedFetch(QK.visitors(VISITORS_LIMIT), () =>
+    fetchVisitors({ limit: VISITORS_LIMIT }),
+  );
 
-  const loadVisitors = useCallback(async () => {
-    setVisitorsLoading(true);
-
-    try {
-      const response = await fetchVisitors({ limit: VISITORS_LIMIT });
-      setVisitors(response.data);
-      setVisitorsError(null);
-    } catch (loadError) {
-      setVisitorsError(
-        loadError instanceof ApiError ? loadError.message : 'Не удалось загрузить посетителей',
-      );
-    } finally {
-      setVisitorsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadVisitors();
-  }, [loadVisitors]);
+  const visitors = visitorsPage?.data ?? [];
 
   const refreshAll = () => {
     void reload();
-    void loadVisitors();
+    void reloadVisitors();
   };
 
   const series = stats?.series ?? [];

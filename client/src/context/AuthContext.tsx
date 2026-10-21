@@ -16,6 +16,7 @@ import {
   login as loginRequest,
   setStoredToken,
 } from '../lib/api';
+import { clearCache } from '../lib/query-cache';
 import type { AdminUser } from '../types';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -68,6 +69,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const handleExpired = () => {
+      // Кэш мог содержать данные прошлой сессии — на выходе его выбрасываем.
+      clearCache();
       setUser(null);
       setStatus('anonymous');
     };
@@ -85,6 +88,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(() => {
     clearStoredToken();
+    clearCache();
     setUser(null);
     setStatus('anonymous');
   }, []);

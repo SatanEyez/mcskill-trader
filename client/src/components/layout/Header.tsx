@@ -1,6 +1,7 @@
 import { Calculator, LockKeyhole, MessageSquareWarning, Newspaper } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 import clsx from 'clsx';
+import { prefetchRoute } from '../../lib/prefetch';
 import { Logo } from './Logo';
 
 const NAV_LINK_CLASS =
@@ -18,6 +19,8 @@ export function Header() {
           </Link>
           <NavLink
             to="/news"
+            onMouseEnter={() => prefetchRoute('/news')}
+            onFocus={() => prefetchRoute('/news')}
             className={({ isActive }) =>
               clsx(
                 NAV_LINK_CLASS,
@@ -44,6 +47,8 @@ export function Header() {
           </NavLink>
           <NavLink
             to="/trade"
+            onMouseEnter={() => prefetchRoute('/trade')}
+            onFocus={() => prefetchRoute('/trade')}
             className={({ isActive }) =>
               clsx(
                 NAV_LINK_CLASS,

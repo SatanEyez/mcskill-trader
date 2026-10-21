@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
 import { fetchResourceStats } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { ResourceStats } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 interface UseResourceStatsResult {
   stats: ResourceStats | null;
@@ -11,30 +12,11 @@ interface UseResourceStatsResult {
 
 /** Сводка каталога: всего ресурсов, минимальная/средняя цена, категории. */
 export function useResourceStats(): UseResourceStatsResult {
-  const [stats, setStats] = useState<ResourceStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, reload } = useCachedFetch(
+    QK.resourceStats,
+    fetchResourceStats,
+    { ttl: 5 * 60_000 },
+  );
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      setStats(await fetchResourceStats());
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Не удалось загрузить статистику каталога',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { stats, loading, error, reload };
+  return { stats: data ?? null, loading, error, reload };
 }

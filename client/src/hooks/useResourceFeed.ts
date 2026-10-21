@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchResources } from '../lib/api';
+import { QK } from '../lib/query-keys';
 import type { Resource, ResourceSort } from '../types';
+import { useCachedFetch } from './useCachedFetch';
 
 export interface ResourceFeedParams {
   search: string;
@@ -23,53 +24,31 @@ interface ResourceFeedResult {
  * Постраничная лента каталога с серверным поиском и фильтром категории.
  * 9 000+ ресурсов нельзя рендерить одним списком, поэтому страница
  * запрашивается отдельно, а поиск выполняется на сервере.
+ *
+ * Каждая страница и набор фильтров кэшируются отдельно: возврат на
+ * предыдущую страницу или сброс поиска рисуется мгновенно.
  */
 export function useResourceFeed(params: ResourceFeedParams): ResourceFeedResult {
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
+  const { search, categoryId, sort, page, limit } = params;
 
-  const reload = useCallback(
-    async (options?: { silent?: boolean }) => {
-      const currentRequest = ++requestId.current;
-
-      if (!options?.silent) setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetchResources({
-          search: params.search || undefined,
-          category_id: params.categoryId || undefined,
-          sort: params.sort,
-          page: params.page,
-          limit: params.limit,
-        });
-
-        if (currentRequest !== requestId.current) return;
-
-        setResources(response.data);
-        setTotal(response.meta.total);
-        setPages(Math.max(1, response.meta.pages ?? 1));
-      } catch (requestError) {
-        if (currentRequest !== requestId.current) return;
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : 'Не удалось загрузить каталог',
-        );
-      } finally {
-        if (currentRequest === requestId.current) setLoading(false);
-      }
-    },
-    [params.search, params.categoryId, params.sort, params.page, params.limit],
+  const { data, loading, error, reload } = useCachedFetch(
+    QK.resourceFeed({ search, categoryId, sort, page, limit }),
+    () =>
+      fetchResources({
+        search: search || undefined,
+        category_id: categoryId || undefined,
+        sort,
+        page,
+        limit,
+      }),
   );
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { resources, total, pages, loading, error, reload };
+  return {
+    resources: data?.data ?? [],
+    total: data?.meta.total ?? 0,
+    pages: Math.max(1, data?.meta.pages ?? 1),
+    loading,
+    error,
+    reload,
+  };
 }
