@@ -178,11 +178,21 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 | Ресурсы, цены, категории, администраторы, роли, журнал, обращения | база MySQL/TiDB |
 | Аватары профилей и картинки, загруженные через админку | база (`uploaded_files`, MEDIUMBLOB) |
 | Иконки прайса (9 252 шт.) | git (`server/uploads/prices/`), отдаются статикой |
+| Копия иконок прайса | база (`price_icons`, MEDIUMBLOB) |
+| Удалённые предметы (стоп-лист импорта) | база (`import_exclusions`) |
 
 Диск контейнера на Render эфемерный, поэтому `POST /api/uploads` больше не пишет файлы на диск:
 тело файла сохраняется в базе, а `/uploads/<uuid>.<ext>` читается из неё. Иконки прайса
-по-прежнему лежат в git и отдаются статикой. `mysql-connection.env` в git не попадает:
-на хостинге задайте `MYSQL_*` переменными окружения.
+по-прежнему лежат в git и отдаются статикой, а `npm run db:price-icons` (в `server`) кладёт их
+копию в `price_icons`: если файла на диске нет, `/uploads/prices/<файл>` отдаст его из базы.
+`mysql-connection.env` в git не попадает: на хостинге задайте `MYSQL_*` переменными окружения.
+
+### Удалённые предметы
+
+Удаление ресурса в админке — это не только `DELETE`: предмет попадает в стоп-лист
+(`import_exclusions`), поэтому следующий импорт прайса его не вернёт. В админке под таблицей
+есть блок «Удалённые предметы»: там видно, кто и когда удалил предмет, а кнопка «Вернуть»
+добавляет его обратно в каталог с прежней ценой, цветом и иконкой.
 
 ## API
 
@@ -207,9 +217,12 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 | GET | `/resources?search=&category_id=&sort=` | public (`sort`: `name_asc`, `price_asc`, `price_desc`, `newest`) |
 | GET | `/resources/:id` | public |
 | POST/PUT/DELETE | `/resources`, `/resources/:id` | Bearer |
+| GET | `/resources/exclusions` | Bearer, право `resources.delete` (стоп-лист импорта) |
+| POST | `/resources/exclusions/:id/restore` | Bearer, право `resources.delete` (вернуть предмет в каталог) |
 | POST | `/trade/calculate` | public |
 | POST | `/uploads` | Bearer (multipart, поле `image`: PNG/JPG/WebP/GIF, до 5 МБ → `{ url, filename, mime, size }`; файл хранится в базе) |
 | GET | `/uploads/:file` | public (иконка прайса из git или файл из базы) |
+| GET | `/uploads/prices/:file` | public (иконка прайса из git, иначе из `price_icons`) |
 
 ### Трейд-расчёт
 
