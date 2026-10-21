@@ -36,6 +36,8 @@ export interface AdminUserRow {
   reviewed_by: string | null;
   last_login_at: Date | string | null;
   last_seen_at: Date | string | null;
+  online_seconds: number | string;
+  session_started_at: Date | string | null;
 }
 
 export type AdminUserBaseRow = Omit<AdminUserRow, 'password_hash'>;
@@ -65,6 +67,19 @@ export interface AdminUserDto {
   prefix_assigned_at: string | null;
   last_login_at: string | null;
   last_seen_at: string | null;
+  /** Накопленное время в сети за всё время, секунды. */
+  online_seconds: number;
+  /** Начало текущей непрерывной сессии; null — сессии ещё не было. */
+  session_started_at: string | null;
+  /** Был в панели последние 10 минут. */
+  is_online: boolean;
+}
+
+/** Сводка по полному списку администрации. */
+export interface StaffSummary {
+  total: number;
+  online: number;
+  total_online_seconds: number;
 }
 
 /** Минимальные данные для проверки сессии в requireAdmin. */

@@ -3,6 +3,7 @@ import { getDb } from '../../db/index.js';
 import { toIso } from '../../utils/date.js';
 import { HttpError } from '../../utils/http-error.js';
 import type { AuthPayload } from '../auth/auth.tokens.js';
+import { PRESENCE_WINDOW_MINUTES } from '../presence/presence.service.js';
 import { normalizePermissions } from '../rbac/permissions.js';
 import type {
   AdminRole,
@@ -11,6 +12,7 @@ import type {
   AdminUserRow,
   ListUsersQuery,
   SessionUser,
+  StaffSummary,
   UserCounts,
 } from './user.types.js';
 
@@ -21,6 +23,7 @@ type UserRowWithRelations = AdminUserBaseRow & {
   role_permissions: unknown;
   prefix_name: string | null;
   prefix_color: string | null;
+  is_online: boolean | number;
 };
 
 const USER_SELECT = `
@@ -39,6 +42,11 @@ const USER_SELECT = `
          u.reviewed_by,
          u.last_login_at,
          u.last_seen_at,
+         u.online_seconds,
+         u.session_started_at,
+         (u.last_seen_at IS NOT NULL
+          AND u.last_seen_at >= CURRENT_TIMESTAMP(3)
+                               - INTERVAL ${PRESENCE_WINDOW_MINUTES} MINUTE) AS is_online,
          -- Снимок логина ревьюера важнее JOIN: он переживает удаление администратора.
          COALESCE(u.reviewed_by_login, reviewer.login) AS reviewed_by_login,
          r.code AS role_code,
@@ -80,6 +88,9 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
     prefix_assigned_at: null,
     last_login_at: row.last_login_at ? toIso(row.last_login_at) : null,
     last_seen_at: row.last_seen_at ? toIso(row.last_seen_at) : null,
+    online_seconds: Number(row.online_seconds ?? 0),
+    session_started_at: row.session_started_at ? toIso(row.session_started_at) : null,
+    is_online: Boolean(row.is_online),
   };
 }
 
@@ -275,6 +286,38 @@ export async function listUsers(query: ListUsersQuery): Promise<ListUsersResult>
   };
 }
 
+export interface ListStaffResult {
+  data: AdminUserDto[];
+  meta: StaffSummary;
+}
+
+/**
+ * Полный список администрации: все, у кого есть доступ в панель, с ролью,
+ * правами и статистикой присутствия. Онлайн — сверху.
+ */
+export async function listStaff(): Promise<ListStaffResult> {
+  const db = await getDb();
+  const rows = await db.query<UserRowWithRelations>(
+    `${USER_SELECT}
+      WHERE u.is_system = FALSE
+        AND u.status = 'approved'
+      ORDER BY is_online DESC,
+               CASE WHEN r.code = 'owner' THEN 0 ELSE 1 END,
+               u.login ASC`,
+  );
+
+  const data = rows.rows.map(toDto);
+
+  return {
+    data,
+    meta: {
+      total: data.length,
+      online: data.filter((user) => user.is_online).length,
+      total_online_seconds: data.reduce((sum, user) => sum + user.online_seconds, 0),
+    },
+  };
+}
+
 /** Создаёт заявку на доступ: аккаунт сразу есть, но вход заблокирован до одобрения. */
 export async function createPendingUser(login: string, passwordHash: string): Promise<AdminUserDto> {
   const db = await getDb();
@@ -303,9 +346,19 @@ export async function createPendingUser(login: string, passwordHash: string): Pr
 
 export async function touchLastLogin(id: string): Promise<void> {
   const db = await getDb();
+  // Вход начинает новую сессию; время с прошлой отметки докидываем только
+  // если админ был в панели меньше окна присутствия назад.
   await db.query(
     `UPDATE admin_users
-        SET last_login_at = CURRENT_TIMESTAMP(3), last_seen_at = CURRENT_TIMESTAMP(3)
+        SET online_seconds = online_seconds + CASE
+              WHEN last_seen_at IS NOT NULL
+               AND last_seen_at >= CURRENT_TIMESTAMP(3) - INTERVAL ${PRESENCE_WINDOW_MINUTES} MINUTE
+                THEN GREATEST(0, TIMESTAMPDIFF(SECOND, last_seen_at, CURRENT_TIMESTAMP(3)))
+              ELSE 0
+            END,
+            last_login_at = CURRENT_TIMESTAMP(3),
+            last_seen_at = CURRENT_TIMESTAMP(3),
+            session_started_at = CURRENT_TIMESTAMP(3)
       WHERE id = ?`,
     [id],
   );
@@ -314,14 +367,29 @@ export async function touchLastLogin(id: string): Promise<void> {
 /**
  * Отметка присутствия. Пишем не чаще раза в минуту на администратора:
  * иначе каждый запрос к API превращался бы в UPDATE.
+ * Заодно копим время в сети: каждый апдейт добавляет секунды, прошедшие
+ * с прошлой отметки. Если пауза больше окна присутствия — начинаем новую сессию.
  */
 export async function touchPresence(id: string): Promise<void> {
   const db = await getDb();
   await db.query(
     `UPDATE admin_users
-        SET last_seen_at = CURRENT_TIMESTAMP(3)
+        SET online_seconds = online_seconds + CASE
+              WHEN last_seen_at IS NOT NULL
+               AND last_seen_at >= CURRENT_TIMESTAMP(3) - INTERVAL ${PRESENCE_WINDOW_MINUTES} MINUTE
+                THEN GREATEST(0, TIMESTAMPDIFF(SECOND, last_seen_at, CURRENT_TIMESTAMP(3)))
+              ELSE 0
+            END,
+            session_started_at = CASE
+              WHEN last_seen_at IS NULL
+                OR last_seen_at < CURRENT_TIMESTAMP(3) - INTERVAL ${PRESENCE_WINDOW_MINUTES} MINUTE
+                THEN CURRENT_TIMESTAMP(3)
+              ELSE session_started_at
+            END,
+            last_seen_at = CURRENT_TIMESTAMP(3)
       WHERE id = ?
-        AND (last_seen_at IS NULL OR last_seen_at < CURRENT_TIMESTAMP(3) - INTERVAL 60 SECOND)`,
+        AND (last_seen_at IS NULL
+             OR last_seen_at < CURRENT_TIMESTAMP(3) - INTERVAL 60 SECOND)`,
     [id],
   );
 }

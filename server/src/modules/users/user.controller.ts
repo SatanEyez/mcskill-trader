@@ -27,6 +27,13 @@ export const listUsers: RequestHandler = asyncHandler(async (req, res) => {
   res.json({ data: result.data, meta: result.meta });
 });
 
+/** Полный список администрации с присутствием — отдельная вкладка «Администрация». */
+export const listStaff: RequestHandler = asyncHandler(async (_req, res) => {
+  const result = await userService.listStaff();
+
+  res.json({ data: result.data, meta: result.meta });
+});
+
 export const approveUser: RequestHandler = asyncHandler(async (req, res) => {
   const data = await userService.approveUser(getId(req), req.auth!);
 

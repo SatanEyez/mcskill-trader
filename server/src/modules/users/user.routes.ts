@@ -7,6 +7,7 @@ import {
   approveUser,
   deleteAvatar,
   deleteUser,
+  listStaff,
   listUsers,
   rejectUser,
   updateAvatar,
@@ -35,6 +36,8 @@ userRouter.get(
   validate(listUsersQuerySchema, 'query'),
   listUsers,
 );
+// Полный список администрации — строго до /:id, иначе «staff» попадёт в params.
+userRouter.get('/staff', requirePermission('users.read'), listStaff);
 userRouter.post(
   '/:id/approve',
   requirePermission('users.write'),

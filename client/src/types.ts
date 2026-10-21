@@ -102,6 +102,19 @@ export interface AdminUser {
   prefix_assigned_at: string | null;
   last_login_at: string | null;
   last_seen_at: string | null;
+  /** Накопленное время в сети, секунды. */
+  online_seconds: number;
+  /** Начало текущей непрерывной сессии (для «в сети сейчас»). */
+  session_started_at: string | null;
+  /** Был в панели последние 10 минут. */
+  is_online: boolean;
+}
+
+/** Сводка по полному списку администрации. */
+export interface AdminStaffMeta {
+  total: number;
+  online: number;
+  total_online_seconds: number;
 }
 
 export interface AdminUserCounts {

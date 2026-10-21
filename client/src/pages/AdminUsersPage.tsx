@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { ApiError, approveUser, rejectUser } from '../lib/api';
-import { formatDateTimeMsk, pluralize } from '../lib/format';
+import { formatDateTimeMsk, formatDuration, pluralize } from '../lib/format';
 import { notifyUsersChanged, useAdminUsers } from '../hooks/useAdminUsers';
+import { useStaff } from '../hooks/useStaff';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import type { AdminRole, AdminStatus, AdminUser } from '../types';
@@ -24,8 +25,11 @@ import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { ChangeRoleDialog } from '../components/admin/ChangeRoleDialog';
 import { DeleteUserDialog } from '../components/admin/DeleteUserDialog';
+import { StaffListPanel } from '../components/admin/StaffListPanel';
 import { UserAccessDialog } from '../components/admin/UserAccessDialog';
 import { PageLoader } from '../components/ui/Spinner';
+
+type UsersView = 'accounts' | 'staff';
 
 const STATUS_META: Record<AdminStatus, { label: string; className: string }> = {
   pending: {
@@ -61,7 +65,15 @@ function requestCountLabel(count: number): string {
 
 export function AdminUsersPage() {
   const [filter, setFilter] = useState<AdminStatus | 'all'>('all');
+  const [view, setView] = useState<UsersView>('accounts');
   const { users, counts, loading, error, reload } = useAdminUsers(filter);
+  const {
+    staff,
+    meta: staffMeta,
+    loading: staffLoading,
+    error: staffError,
+    reload: reloadStaff,
+  } = useStaff(view === 'staff');
   const { user: currentUser, can } = useAuth();
   const { notify } = useToast();
 
@@ -94,6 +106,7 @@ export function AdminUsersPage() {
       notify(`Доступ для «${target.login}» одобрен`, 'success');
       notifyUsersChanged();
       await reload({ silent: true });
+      void reloadStaff({ silent: true });
     } catch (approveError) {
       notify(
         approveError instanceof ApiError
@@ -115,6 +128,7 @@ export function AdminUsersPage() {
       notify(`Заявка «${target.login}» отклонена`, 'info');
       notifyUsersChanged();
       await reload({ silent: true });
+      void reloadStaff({ silent: true });
     } catch (rejectError) {
       notify(
         rejectError instanceof ApiError ? rejectError.message : 'Не удалось отклонить заявку',
@@ -130,6 +144,7 @@ export function AdminUsersPage() {
     notify(`Администратор «${deleted.login}» удалён`, 'success');
     notifyUsersChanged();
     void reload({ silent: true });
+    void reloadStaff({ silent: true });
   };
 
   const handleRoleChanged = (updated: AdminUser) => {
@@ -142,6 +157,7 @@ export function AdminUsersPage() {
     );
     notifyUsersChanged();
     void reload({ silent: true });
+    void reloadStaff({ silent: true });
   };
 
   const handleAccessUpdated = (updated: AdminUser) => {
@@ -149,6 +165,7 @@ export function AdminUsersPage() {
     notify(`Доступ «${updated.login}» обновлён`, 'success');
     notifyUsersChanged();
     void reload({ silent: true });
+    void reloadStaff({ silent: true });
   };
 
   const canDelete = (target: AdminUser): boolean =>
@@ -209,6 +226,16 @@ export function AdminUsersPage() {
         : 'ещё не входил',
     );
 
+    if (target.is_online) {
+      parts.push('сейчас в сети');
+    } else if (target.last_seen_at) {
+      parts.push(`был(а) в сети ${formatDateTimeMsk(target.last_seen_at)}`);
+    }
+
+    if (target.online_seconds > 0) {
+      parts.push(`всего в сети ${formatDuration(target.online_seconds)}`);
+    }
+
     return parts.join(' · ');
   };
 
@@ -234,15 +261,76 @@ export function AdminUsersPage() {
 
           <button
             type="button"
-            onClick={() => void reload({ silent: true })}
+            onClick={() => {
+              if (view === 'staff') void reloadStaff({ silent: true });
+              else void reload({ silent: true });
+            }}
             className="btn btn-secondary shrink-0"
-            disabled={loading}
+            disabled={view === 'staff' ? staffLoading : loading}
           >
-            <RefreshCw className={clsx('h-4 w-4', loading && 'animate-spin')} aria-hidden />
+            <RefreshCw
+              className={clsx(
+                'h-4 w-4',
+                (view === 'staff' ? staffLoading : loading) && 'animate-spin',
+              )}
+              aria-hidden
+            />
             Обновить
           </button>
         </div>
 
+        <div className="mt-6 inline-flex flex-wrap gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1">
+          <button
+            type="button"
+            onClick={() => setView('accounts')}
+            className={clsx(
+              'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition',
+              view === 'accounts'
+                ? 'bg-white/[0.06] text-white'
+                : 'text-slate-500 hover:text-slate-300',
+            )}
+          >
+            <UsersRound className="h-3.5 w-3.5" aria-hidden />
+            Аккаунты
+            <span className="text-[10px] text-slate-500">{counts.total}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('staff')}
+            className={clsx(
+              'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition',
+              view === 'staff'
+                ? 'bg-white/[0.06] text-white'
+                : 'text-slate-500 hover:text-slate-300',
+            )}
+          >
+            <UserCheck className="h-3.5 w-3.5" aria-hidden />
+            Администрация
+            <span className="text-[10px] text-slate-500">{counts.approved}</span>
+          </button>
+        </div>
+
+        {view === 'staff' ? (
+          <StaffListPanel
+            staff={staff}
+            meta={staffMeta}
+            pendingCount={counts.pending}
+            loading={staffLoading}
+            error={staffError}
+            currentUserId={currentUser?.id}
+            can={can}
+            busyId={busyId}
+            reload={reloadStaff}
+            onShowPending={() => {
+              setView('accounts');
+              setFilter('pending');
+            }}
+            onAccess={setAccessUser}
+            onDelete={setDeletingUser}
+            onRoleChange={(user, role) => setRoleChange({ user, role })}
+          />
+        ) : (
+          <>
         <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <div className="panel p-4">
             <div className="flex items-center justify-between gap-2">
@@ -410,7 +498,7 @@ export function AdminUsersPage() {
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <span
                         className={clsx(
-                          'grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border text-sm font-semibold uppercase',
+                          'relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border text-sm font-semibold uppercase',
                           AVATAR_META[target.status],
                         )}
                       >
@@ -424,6 +512,14 @@ export function AdminUsersPage() {
                         ) : (
                           target.login.slice(0, 1)
                         )}
+                        <span
+                          className={clsx(
+                            'absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0b1118]',
+                            target.is_online ? 'bg-emerald-400' : 'bg-slate-600',
+                          )}
+                          title={target.is_online ? 'Сейчас в сети' : 'Не в сети'}
+                          aria-hidden
+                        />
                       </span>
 
                       <div className="min-w-0 flex-1">
@@ -567,11 +663,14 @@ export function AdminUsersPage() {
             </ul>
           )}
         </div>
+          </>
+        )}
 
         <p className="mt-4 text-[11px] leading-relaxed text-slate-600">
           Одобрять заявки может администратор с правом users.write, удалять аккаунты —
           с правом users.delete. Роли и префиксы выдаёт носитель права users.roles.
-          Пароль хранится в виде scrypt-хеша.
+          Время в сети считается по активности в панели: онлайн — если заходил за последние
+          10 минут, «всего в сети» — накопленное время за все сессии.
         </p>
       </main>
 

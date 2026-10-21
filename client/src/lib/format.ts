@@ -117,6 +117,21 @@ export function formatTimeMsk(isoDate: string | null | undefined): string {
   return date ? mskTimeFormatter.format(date) : '—';
 }
 
+/** «2 ч 15 мин», «18 мин», «меньше минуты». Для времени в сети. */
+export function formatDuration(seconds: number | null | undefined): string {
+  if (!Number.isFinite(seconds) || (seconds ?? 0) <= 0) return '—';
+
+  const total = Math.floor(seconds as number);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+
+  if (hours > 0 && minutes > 0) return `${hours} ч ${minutes} мин`;
+  if (hours > 0) return `${hours} ч`;
+  if (minutes > 0) return `${minutes} мин`;
+
+  return 'меньше минуты';
+}
+
 /** «20.10.2026, 02:41:12 МСК». */
 export function formatDateTimeMsk(isoDate: string | null | undefined): string {
   const date = parse(isoDate);

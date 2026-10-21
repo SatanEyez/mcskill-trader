@@ -4,6 +4,7 @@ import type {
   AdminRole,
   AdminStatus,
   AdminUser,
+  AdminStaffMeta,
   AdminUserCounts,
   ApiMeta,
   AuditGroup,
@@ -434,6 +435,14 @@ export async function fetchUsers(
 ): Promise<{ data: AdminUser[]; meta: AdminUserCounts }> {
   const suffix = status && status !== 'all' ? `?status=${status}` : '';
   return request<{ data: AdminUser[]; meta: AdminUserCounts }>(`/users${suffix}`, { auth: true });
+}
+
+/** Полный список администрации (все одобренные) с присутствием и временем в сети. */
+export async function fetchStaffMembers(): Promise<{
+  data: AdminUser[];
+  meta: AdminStaffMeta;
+}> {
+  return request<{ data: AdminUser[]; meta: AdminStaffMeta }>('/users/staff', { auth: true });
 }
 
 export async function approveUser(id: string): Promise<AdminUser> {
