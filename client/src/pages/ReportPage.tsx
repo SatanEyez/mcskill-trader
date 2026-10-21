@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
+import { OnlineAdminsCard } from '../components/support/OnlineAdminsCard';
 import { Spinner } from '../components/ui/Spinner';
 import { ApiError, createReport } from '../lib/api';
 import type { ReportInput, SupportTicket, TicketKind } from '../types';
@@ -233,6 +234,8 @@ export function ReportPage() {
               </form>
 
               <aside className="space-y-4">
+                <OnlineAdminsCard />
+
                 <div className="panel p-5">
                   <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
                     <ShieldCheck className="h-4 w-4 text-accent" aria-hidden />
