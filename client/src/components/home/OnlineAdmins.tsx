@@ -12,7 +12,7 @@ export function OnlineAdmins() {
   const { admins, loading, error } = useOnlineAdmins();
 
   return (
-    <aside className="card-surface flex h-full flex-col p-5">
+    <aside className="panel flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-white">

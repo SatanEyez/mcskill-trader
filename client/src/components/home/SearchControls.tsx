@@ -1,10 +1,15 @@
-import { useRef } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Search, SlidersHorizontal, X } from 'lucide-react';
 import clsx from 'clsx';
 import { SORT_OPTIONS } from '../../lib/constants';
 import type { ResourceSort } from '../../types';
 
+/** Сколько категорий показываем, пока список не раскрыли: две аккуратные строки. */
+const COLLAPSED_CATEGORIES = 12;
+
 interface SearchControlsProps {
+  /** Заголовок над поиском: на главной он один, на странице «Ресурсы» — другой. */
+  title?: string;
   search: string;
   onSearchChange: (value: string) => void;
   categoryId: string;
@@ -20,6 +25,7 @@ interface SearchControlsProps {
 }
 
 export function SearchControls({
+  title = 'Каталог ресурсов',
   search,
   onSearchChange,
   categoryId,
@@ -33,12 +39,20 @@ export function SearchControls({
 }: SearchControlsProps) {
   const chipsRef = useRef<HTMLDivElement>(null);
   const isAll = categoryId === 'all';
+  const [allCategories, setAllCategories] = useState(false);
+
+  const collapsed = categories.slice(0, COLLAPSED_CATEGORIES);
+  const selectedOutside = categories.find(
+    (item) => item.id === categoryId && !collapsed.some((short) => short.id === item.id),
+  );
+  const visibleCategories = selectedOutside ? [...collapsed, selectedOutside] : collapsed;
+  const hiddenCount = categories.length - collapsed.length;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white sm:text-2xl">Каталог ресурсов</h2>
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">{title}</h2>
           <p className="mt-1 text-sm text-slate-500">
             {filteredCount === total
               ? `${total} предметов в базе`
@@ -142,7 +156,7 @@ export function SearchControls({
           </span>
         </button>
 
-        {categories.map((item) => {
+        {(allCategories ? categories : visibleCategories).map((item) => {
           const active = categoryId === item.id;
 
           return (
@@ -171,6 +185,27 @@ export function SearchControls({
             </button>
           );
         })}
+
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setAllCategories((current) => !current)}
+            className="chip border-white/[0.06] bg-white/[0.02] text-slate-500 hover:border-accent/30 hover:text-accent"
+            aria-expanded={allCategories}
+          >
+            {allCategories ? (
+              <>
+                Свернуть
+                <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+              </>
+            ) : (
+              <>
+                Ещё {hiddenCount}
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

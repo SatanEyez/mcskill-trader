@@ -4,6 +4,7 @@ import { LayoutGrid } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { HomePage } from './pages/HomePage';
+import { ResourcesPage } from './pages/ResourcesPage';
 import { TradePage } from './pages/TradePage';
 import { ReportPage } from './pages/ReportPage';
 import { NewsPage } from './pages/NewsPage';
@@ -146,6 +147,7 @@ export function App() {
           <VisitTracker />
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/trade" element={<TradePage />} />
             <Route path="/report" element={<ReportPage />} />
             <Route path="/news" element={<NewsPage />} />

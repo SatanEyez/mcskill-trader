@@ -27,11 +27,16 @@ const ADMIN_FEED = { search: '', categoryId: '', sort: 'name_asc', page: 1, limi
 const PUBLIC_FEED = { search: '', categoryId: '', sort: 'name_asc', page: 1, limit: 36 };
 const ADMIN_NEWS = { limit: 20, offset: 0 };
 const PUBLIC_NEWS = { limit: 9, offset: 0 };
+const HOME_NEWS = { limit: 3, offset: 0 };
 
 type Loader = () => void;
 
 const ROUTE_LOADERS: Record<string, Loader[]> = {
   '/': [
+    () => prefetch(QK.resourceStats, fetchResourceStats),
+    () => prefetch(QK.news(HOME_NEWS.limit, HOME_NEWS.offset), () => fetchNews(HOME_NEWS)),
+  ],
+  '/resources': [
     () => prefetch(QK.resourceStats, fetchResourceStats),
     () =>
       prefetch(QK.resourceFeed(PUBLIC_FEED), () =>

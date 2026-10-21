@@ -26,7 +26,7 @@ export function NotFoundPage() {
                 <ArrowLeft className="h-4 w-4" aria-hidden />
                 На главную
               </Link>
-              <Link to="/#resources" className="btn btn-secondary">
+              <Link to="/resources" className="btn btn-secondary">
                 <Compass className="h-4 w-4" aria-hidden />
                 К ресурсам
               </Link>

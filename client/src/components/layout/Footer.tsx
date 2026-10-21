@@ -23,9 +23,9 @@ export function Footer() {
               </p>
               <ul className="space-y-2 text-slate-400">
                 <li>
-                  <a href="#resources" className="transition hover:text-accent">
+                  <Link to="/resources" className="transition hover:text-accent">
                     Каталог ресурсов
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <Link to="/trade" className="transition hover:text-accent">
