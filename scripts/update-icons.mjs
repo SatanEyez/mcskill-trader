@@ -116,7 +116,10 @@ async function main() {
     const entry = byKey.get(row.source_key);
     if (!entry) continue;
 
-    const iconName = `${String(entry.icon_index).padStart(5, '0')}.png`;
+    // Имя файла — номер ячейки спрайта, как его нарезает импорт
+    // (`spriteIndex + 1`). Иначе 3D-файлы садятся на имена 2D-иконок
+    // соседнего предмета: icon_index одного равен icon_index + 1 другого.
+    const iconName = `${String(entry.icon_index + 1).padStart(5, '0')}.png`;
     const expectedUrl = `${ICON_URL}/${iconName}`;
     const sourcePath = join(args.src, entry.file);
     const targetPath = join(ICON_DIR, iconName);
