@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
-import { ImagePlus, Link2, Save, Tag, Tags, Upload, X } from 'lucide-react';
+import { ImagePlus, Link2, Plus, Save, Tag, Tags, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { ApiError, createResource, updateResource, uploadImage } from '../../lib/api';
@@ -21,7 +21,8 @@ interface FormState {
   name: string;
   nameColor: string;
   price: string;
-  categoryId: string;
+  /** Все категории предмета: первая — основная, дальше дополнительные. */
+  categoryIds: string[];
   imageUrl: string;
 }
 
@@ -31,9 +32,12 @@ const EMPTY_FORM: FormState = {
   name: '',
   nameColor: '',
   price: '',
-  categoryId: '',
+  categoryIds: [],
   imageUrl: '',
 };
+
+/** Основная категория + до четырёх дополнительных. */
+const MAX_CATEGORIES = 5;
 
 const NAME_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
@@ -104,12 +108,16 @@ export function ResourceFormModal({
             name: resource.name,
             nameColor: resource.name_color ?? '',
             price: String(resource.min_price),
-            categoryId: resource.category_id ?? '',
+            categoryIds: resource.category_ids?.length
+              ? [...resource.category_ids]
+              : resource.category_id
+                ? [resource.category_id]
+                : [],
             imageUrl: resource.image_url,
           }
         : {
             ...EMPTY_FORM,
-            categoryId: categories[0]?.id ?? '',
+            categoryIds: categories[0] ? [categories[0].id] : [],
           },
     );
     setErrors({});
@@ -128,6 +136,49 @@ export function ResourceFormModal({
     setErrors((current) => ({ ...current, [field]: undefined }));
     if (apiError) setApiError(null);
   };
+
+  /** Основная категория — первая в списке; выбор «Без категории» убирает её. */
+  const setPrimaryCategory = (value: string) => {
+    setForm((current) => {
+      const rest = current.categoryIds.slice(1).filter((id) => id !== value);
+      return { ...current, categoryIds: value ? [value, ...rest] : rest };
+    });
+    if (apiError) setApiError(null);
+  };
+
+  const setExtraCategory = (index: number, value: string) => {
+    setForm((current) => {
+      const next = [...current.categoryIds];
+
+      if (index < 1 || index >= next.length) return current;
+
+      if (!value) next.splice(index, 1);
+      else next[index] = value;
+
+      return { ...current, categoryIds: next };
+    });
+    if (apiError) setApiError(null);
+  };
+
+  const addCategory = () => {
+    setForm((current) => {
+      if (current.categoryIds.length >= MAX_CATEGORIES) return current;
+
+      const used = new Set(current.categoryIds);
+      const available = categories.find((category) => !used.has(category.id));
+
+      return available
+        ? { ...current, categoryIds: [...current.categoryIds, available.id] }
+        : current;
+    });
+    if (apiError) setApiError(null);
+  };
+
+  const primaryCategoryId = form.categoryIds[0] ?? '';
+  const usedCategoryIds = new Set(form.categoryIds);
+  const canAddCategory =
+    form.categoryIds.length < MAX_CATEGORIES &&
+    categories.some((category) => !usedCategoryIds.has(category.id));
 
   /** Загрузка выбранного/перетащенного файла: сервер вернёт путь для image_url. */
   const handleFile = async (file: File | undefined) => {
@@ -186,11 +237,13 @@ export function ResourceFormModal({
       return;
     }
 
+    const categoryIds = form.categoryIds.filter(Boolean);
     const payload = {
       name: form.name.trim(),
       name_color: form.nameColor.trim() || null,
       min_price: Number(form.price.replace(',', '.')),
-      category_id: form.categoryId || null,
+      category_id: categoryIds[0] ?? null,
+      category_ids: categoryIds,
       image_url: form.imageUrl.trim(),
     };
 
@@ -317,8 +370,8 @@ export function ResourceFormModal({
                 </div>
                 <select
                   id="resource-category"
-                  value={form.categoryId}
-                  onChange={(event) => updateField('categoryId', event.target.value)}
+                  value={primaryCategoryId}
+                  onChange={(event) => setPrimaryCategory(event.target.value)}
                   className="field"
                 >
                   <option value="">Без категории</option>
@@ -328,6 +381,56 @@ export function ResourceFormModal({
                     </option>
                   ))}
                 </select>
+
+                {form.categoryIds.slice(1).map((categoryId, index) => {
+                  const rowIndex = index + 1;
+
+                  return (
+                    <div key={`extra-${rowIndex}`} className="mt-2 flex items-center gap-2">
+                      <select
+                        value={categoryId}
+                        onChange={(event) => setExtraCategory(rowIndex, event.target.value)}
+                        className="field flex-1"
+                        aria-label={`Дополнительная категория ${rowIndex}`}
+                      >
+                        {categories
+                          .filter(
+                            (category) =>
+                              category.id === categoryId ||
+                              !usedCategoryIds.has(category.id),
+                          )
+                          .map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setExtraCategory(rowIndex, '')}
+                        className="icon-btn h-9 w-9 shrink-0 hover:border-rose-500/30 hover:text-rose-300"
+                        title="Убрать эту категорию"
+                        aria-label="Убрать эту категорию"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={addCategory}
+                  disabled={!canAddCategory}
+                  className="btn btn-secondary mt-2 w-full px-3 py-1.5 text-[11px] disabled:opacity-40"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Ещё категория
+                </button>
+                <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+                  Предмет с несколькими категориями виден в каталоге в каждой из них —
+                  основная категория задаёт бейдж на карточке.
+                </p>
               </div>
             </div>
 
@@ -381,10 +484,10 @@ export function ResourceFormModal({
                 <button
                   key={category.id}
                   type="button"
-                  onClick={() => updateField('categoryId', category.id)}
+                  onClick={() => setPrimaryCategory(category.id)}
                   className={clsx(
                     'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition',
-                    form.categoryId === category.id
+                    primaryCategoryId === category.id
                       ? 'border-accent/40 bg-accent/10 text-accent'
                       : 'border-white/[0.06] bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300',
                   )}
@@ -395,10 +498,10 @@ export function ResourceFormModal({
               ))}
               <button
                 type="button"
-                onClick={() => updateField('categoryId', '')}
+                onClick={() => setPrimaryCategory('')}
                 className={clsx(
                   'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] transition',
-                  form.categoryId === ''
+                  primaryCategoryId === ''
                     ? 'border-accent/40 bg-accent/10 text-accent'
                     : 'border-white/[0.06] bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300',
                 )}

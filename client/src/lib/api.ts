@@ -369,6 +369,17 @@ export async function deleteResource(id: string): Promise<void> {
   });
 }
 
+/** Массовое удаление: предметы попадают в стоп-лист импорта, как при одиночном удалении. */
+export async function deleteResources(
+  ids: string[],
+): Promise<{ deleted: string[]; count: number }> {
+  const response = await request<{ data: { deleted: string[]; count: number } }>(
+    '/resources/bulk-delete',
+    { method: 'POST', body: { ids }, auth: true },
+  );
+  return response.data;
+}
+
 /** Удалённые предметы: импорт прайса их пропускает, пока запись не убрать. */
 export async function fetchExcludedResources(): Promise<ExcludedResource[]> {
   const response = await request<{ data: ExcludedResource[] }>('/resources/exclusions', {

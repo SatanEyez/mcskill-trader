@@ -29,6 +29,12 @@ const categoryIdField = z
   .uuid('Некорректный идентификатор категории')
   .nullable();
 
+/** Дополнительные категории: основная первой. Максимум 5 задан в сервисе. */
+const categoryIdsField = z
+  .array(z.string().uuid('Некорректный идентификатор категории'))
+  .max(5, 'Можно выбрать не больше 5 категорий')
+  .nullable();
+
 /**
  * HEX-цвет названия (#RRGGBB) или null. Сам формат проверяет сервис:
  * для него нужен ответ 400, а общая Zod-валидация отдаёт 422.
@@ -42,6 +48,7 @@ export const createResourceSchema = z
     min_price: priceField,
     image_url: imageUrlField.default(''),
     category_id: categoryIdField.optional().default(null),
+    category_ids: categoryIdsField.optional(),
   })
   .strict();
 
@@ -52,11 +59,21 @@ export const updateResourceSchema = z
     min_price: priceField.optional(),
     image_url: imageUrlField.optional(),
     category_id: categoryIdField.optional(),
+    category_ids: categoryIdsField.optional(),
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, {
     message: 'Передайте хотя бы одно поле для изменения',
   });
+
+export const bulkDeleteResourcesSchema = z
+  .object({
+    ids: z
+      .array(z.string().uuid('Некорректный идентификатор предмета'))
+      .min(1, 'Выберите хотя бы один предмет')
+      .max(200, 'За один раз можно удалить не больше 200 предметов'),
+  })
+  .strict();
 
 export const listResourcesQuerySchema = z
   .object({

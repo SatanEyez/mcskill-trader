@@ -20,7 +20,9 @@ const CATEGORY_SELECT = `
          c.name,
          c.created_at,
          c.updated_at,
-         (SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id) AS resource_count
+         ((SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id)
+          + (SELECT COUNT(*) FROM resource_categories AS rc WHERE rc.category_id = c.id))
+           AS resource_count
     FROM categories AS c
 `;
 
@@ -123,17 +125,23 @@ export async function deleteCategory(id: string): Promise<DeleteCategoryResult> 
   }
 
   const db = await getDb();
-  const result = await db.query('DELETE FROM categories WHERE id = ?', [id]);
+  const primary = await db.query<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM resources WHERE category_id = ?',
+    [id],
+  );
 
-  if (result.rowCount === 0) {
-    throw new HttpError(404, 'Категория не найдена');
-  }
+  await db.transaction(async (tx) => {
+    // Дополнительные категории на этом предмете больше не нужны — иначе
+    // останутся «висячие» связи на удалённую категорию.
+    await tx.query('DELETE FROM resource_categories WHERE category_id = ?', [id]);
+    await tx.query('DELETE FROM categories WHERE id = ?', [id]);
+  });
 
   invalidateResourceListCache();
 
   return {
     id,
     name: existing.name,
-    moved_resources: Number(existing.resource_count ?? 0),
+    moved_resources: Number(primary.rows[0]?.count ?? 0),
   };
 }

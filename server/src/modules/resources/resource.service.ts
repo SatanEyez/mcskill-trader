@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { getDb } from '../../db/index.js';
+import { getDb, type Database } from '../../db/index.js';
 import { toIso } from '../../utils/date.js';
 import { HttpError } from '../../utils/http-error.js';
 import { escapeLike } from '../../utils/sql.js';
@@ -14,6 +14,7 @@ import {
 } from './resource.cache.js';
 import type {
   ListResourcesQuery,
+  ResourceCategoryRef,
   ResourceDto,
   ResourceInput,
   ResourceRow,
@@ -57,7 +58,13 @@ function assertNameColor(nameColor: string | null | undefined): void {
   }
 }
 
-function toDto(row: ResourceRow): ResourceDto {
+function toDto(row: ResourceRow, extra: ResourceCategoryRef[] = []): ResourceDto {
+  const primary: ResourceCategoryRef | null =
+    row.category_id && row.category_name
+      ? { id: row.category_id, name: row.category_name }
+      : null;
+  const categories = primary ? [primary, ...extra] : extra;
+
   return {
     id: row.id,
     name: row.name,
@@ -66,22 +73,110 @@ function toDto(row: ResourceRow): ResourceDto {
     image_url: row.image_url,
     category_id: row.category_id,
     category: row.category_name ?? 'Без категории',
+    categories,
+    category_ids: categories.map((item) => item.id),
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
   };
 }
 
-async function assertCategoryExists(categoryId: string | null): Promise<void> {
-  if (categoryId === null) return;
+/** Максимум категорий на предмет: основная + четыре дополнительные. */
+export const MAX_RESOURCE_CATEGORIES = 5;
+
+/**
+ * Дополнительные категории для набора ресурсов (основная в resources.category_id
+ * сюда не входит). resourceIds = null — загрузить для всего каталога.
+ */
+async function loadExtraCategories(
+  resourceIds: string[] | null,
+): Promise<Map<string, ResourceCategoryRef[]>> {
+  const map = new Map<string, ResourceCategoryRef[]>();
+
+  if (resourceIds !== null && resourceIds.length === 0) return map;
 
   const db = await getDb();
-  const result = await db.query<{ id: string }>('SELECT id FROM categories WHERE id = ?', [
-    categoryId,
+  const params = resourceIds === null ? [] : [resourceIds];
+  const whereSql = resourceIds === null ? '' : 'WHERE rc.resource_id IN (?)';
+  const result = await db.query<{ resource_id: string; id: string; name: string }>(
+    `SELECT rc.resource_id, c.id, c.name
+       FROM resource_categories AS rc
+       JOIN categories AS c ON c.id = rc.category_id
+       ${whereSql}
+      ORDER BY c.name ASC`,
+    params,
+  );
+
+  for (const row of result.rows) {
+    const list = map.get(row.resource_id) ?? [];
+    list.push({ id: row.id, name: row.name });
+    map.set(row.resource_id, list);
+  }
+
+  return map;
+}
+
+/** Убирает дубли и пустые значения, сохраняя порядок (первая = основная). */
+function normalizeCategoryIds(ids: readonly string[] | null | undefined): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const id of ids ?? []) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+
+  return result;
+}
+
+/** Список категорий из тела запроса: новое поле массива важнее одиночного. */
+function requestedCategoryIds(
+  input: Partial<Pick<ResourceInput, 'category_id' | 'category_ids'>>,
+): string[] | null {
+  if (input.category_ids !== undefined) return normalizeCategoryIds(input.category_ids);
+
+  if (input.category_id !== undefined) {
+    return input.category_id ? [input.category_id] : [];
+  }
+
+  return null;
+}
+
+function assertCategoryLimit(categoryIds: readonly string[]): void {
+  if (categoryIds.length > MAX_RESOURCE_CATEGORIES) {
+    throw new HttpError(
+      400,
+      `Можно выбрать не больше ${MAX_RESOURCE_CATEGORIES} категорий для одного предмета`,
+    );
+  }
+}
+
+async function assertCategoriesExist(categoryIds: readonly string[]): Promise<void> {
+  if (categoryIds.length === 0) return;
+
+  const db = await getDb();
+  const result = await db.query<{ id: string }>('SELECT id FROM categories WHERE id IN (?)', [
+    [...categoryIds],
   ]);
 
-  if (result.rows.length === 0) {
+  if (result.rows.length !== categoryIds.length) {
     throw new HttpError(400, 'Категория не найдена');
   }
+}
+
+/** Перезаписывает дополнительные категории ресурса. */
+async function saveExtraCategories(
+  db: Awaited<ReturnType<typeof getDb>>,
+  resourceId: string,
+  categoryIds: readonly string[],
+): Promise<void> {
+  await db.query('DELETE FROM resource_categories WHERE resource_id = ?', [resourceId]);
+
+  if (categoryIds.length === 0) return;
+
+  await db.query('INSERT INTO resource_categories (resource_id, category_id) VALUES ?', [
+    categoryIds.map((categoryId) => [resourceId, categoryId]),
+  ]);
 }
 
 export async function listResources(query: ListResourcesQuery): Promise<ResourceListResult> {
@@ -98,8 +193,13 @@ export async function listResources(query: ListResourcesQuery): Promise<Resource
   }
 
   if (query.category_id) {
-    params.push(query.category_id);
-    conditions.push('r.category_id = ?');
+    params.push(query.category_id, query.category_id);
+    conditions.push(
+      `(r.category_id = ?
+        OR EXISTS (SELECT 1
+                     FROM resource_categories AS rc
+                    WHERE rc.resource_id = r.id AND rc.category_id = ?))`,
+    );
   }
 
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -127,8 +227,9 @@ export async function listResources(query: ListResourcesQuery): Promise<Resource
   );
 
   const total = Number(rows.rows[0]?.total_count ?? 0);
+  const extras = await loadExtraCategories(rows.rows.map((row) => row.id));
   const result: ResourceListResult = {
-    data: rows.rows.map(toDto),
+    data: rows.rows.map((row) => toDto(row, extras.get(row.id) ?? [])),
     total,
     page: query.page,
     limit: query.limit,
@@ -151,7 +252,8 @@ export async function listCatalog(): Promise<ResourceDto[]> {
 
   const db = await getDb();
   const rows = await db.query<ResourceRow>(`${RESOURCE_SELECT} ORDER BY r.name ASC`);
-  const data = rows.rows.map(toDto);
+  const extras = await loadExtraCategories(null);
+  const data = rows.rows.map((row) => toDto(row, extras.get(row.id) ?? []));
 
   writeCatalogCache(data);
   return data;
@@ -181,9 +283,12 @@ export async function getResourceStats(): Promise<ResourceStats> {
   const categories = await db.query<{ id: string; name: string; count: number }>(
     `SELECT c.id,
             c.name,
-            (SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id) AS count
+            ((SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id)
+             + (SELECT COUNT(*) FROM resource_categories AS rc WHERE rc.category_id = c.id))
+               AS count
        FROM categories AS c
       WHERE EXISTS (SELECT 1 FROM resources AS r WHERE r.category_id = c.id)
+         OR EXISTS (SELECT 1 FROM resource_categories AS rc WHERE rc.category_id = c.id)
       ORDER BY count DESC, c.name ASC`,
   );
 
@@ -222,27 +327,39 @@ export async function getResourceById(id: string): Promise<ResourceDto> {
     throw new HttpError(404, 'Ресурс не найден');
   }
 
-  return toDto(row);
+  const extras = await loadExtraCategories([id]);
+
+  return toDto(row, extras.get(id) ?? []);
 }
 
 export async function createResource(input: ResourceInput): Promise<ResourceDto> {
   assertNameColor(input.name_color);
-  await assertCategoryExists(input.category_id);
+
+  const categoryIds = requestedCategoryIds(input) ?? [];
+
+  assertCategoryLimit(categoryIds);
+  await assertCategoriesExist(categoryIds);
+
   const db = await getDb();
   const id = randomUUID();
+  const primaryCategoryId = categoryIds[0] ?? null;
 
-  await db.query(
-    `INSERT INTO resources (id, name, name_color, min_price, image_url, category_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      input.name,
-      input.name_color,
-      input.min_price,
-      input.image_url,
-      input.category_id,
-    ],
-  );
+  await db.transaction(async (tx) => {
+    await tx.query(
+      `INSERT INTO resources (id, name, name_color, min_price, image_url, category_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        input.name,
+        input.name_color,
+        input.min_price,
+        input.image_url,
+        primaryCategoryId,
+      ],
+    );
+
+    await saveExtraCategories(tx, id, categoryIds.slice(1));
+  });
 
   invalidateResourceListCache();
 
@@ -259,33 +376,37 @@ export async function updateResource(
   input: ResourceUpdate,
 ): Promise<ResourceUpdateResult> {
   const current = await getResourceById(id);
-  const nextCategoryId =
-    input.category_id !== undefined ? input.category_id : current.category_id;
+  const nextCategoryIds = requestedCategoryIds(input) ?? current.category_ids;
 
-  await assertCategoryExists(nextCategoryId);
+  assertCategoryLimit(nextCategoryIds);
+  await assertCategoriesExist(nextCategoryIds);
 
   const next = {
     name: input.name ?? current.name,
     name_color: input.name_color !== undefined ? input.name_color : current.name_color,
     min_price: input.min_price ?? current.min_price,
     image_url: input.image_url ?? current.image_url,
-    category_id: nextCategoryId,
+    category_id: nextCategoryIds[0] ?? null,
   };
 
   assertNameColor(next.name_color);
 
   const db = await getDb();
-  await db.query(
-    `UPDATE resources
-        SET name = ?,
-            name_color = ?,
-            min_price = ?,
-            image_url = ?,
-            category_id = ?,
-            updated_at = CURRENT_TIMESTAMP(3)
-      WHERE id = ?`,
-    [next.name, next.name_color, next.min_price, next.image_url, next.category_id, id],
-  );
+  await db.transaction(async (tx) => {
+    await tx.query(
+      `UPDATE resources
+          SET name = ?,
+              name_color = ?,
+              min_price = ?,
+              image_url = ?,
+              category_id = ?,
+              updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = ?`,
+      [next.name, next.name_color, next.min_price, next.image_url, next.category_id, id],
+    );
+
+    await saveExtraCategories(tx, id, nextCategoryIds.slice(1));
+  });
 
   invalidateResourceListCache();
 
@@ -307,41 +428,114 @@ export async function deleteResource(id: string, actor?: AuthPayload): Promise<R
       throw new HttpError(404, 'Ресурс не найден');
     }
 
-    // Стоп-лист: следующий импорт не вернёт предмет обратно. Данные храним,
-    // чтобы его можно было восстановить одной кнопкой.
-    await tx.query(
-      `INSERT INTO import_exclusions
-         (id, source_key, name_key, name, min_price, image_url, name_color, category_id,
-          created_by, created_by_login)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         name_key = VALUES(name_key),
-         name = VALUES(name),
-         min_price = VALUES(min_price),
-         image_url = VALUES(image_url),
-         name_color = VALUES(name_color),
-         category_id = VALUES(category_id),
-         created_by = VALUES(created_by),
-         created_by_login = VALUES(created_by_login),
-         created_at = CURRENT_TIMESTAMP(3)`,
-      [
-        randomUUID(),
-        keyRow.rows[0]?.source_key ?? null,
-        current.name.toLowerCase(),
-        current.name,
-        current.min_price,
-        current.image_url,
-        current.name_color,
-        current.category_id,
-        actor?.sub ?? null,
-        actor?.login ?? null,
-      ],
-    );
+    await insertExclusion(tx, current, keyRow.rows[0]?.source_key ?? null, actor);
+    await tx.query('DELETE FROM resource_categories WHERE resource_id = ?', [id]);
   });
 
   invalidateResourceListCache();
 
   return current;
+}
+
+/** Стоп-лист: следующий импорт не вернёт предмет обратно. Данные храним,
+ * чтобы его можно было восстановить одной кнопкой. */
+async function insertExclusion(
+  db: Database,
+  resource: ResourceDto,
+  sourceKey: string | null,
+  actor?: AuthPayload,
+): Promise<void> {
+  await db.query(
+    `INSERT INTO import_exclusions
+       (id, source_key, name_key, name, min_price, image_url, name_color, category_id,
+        created_by, created_by_login)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       name_key = VALUES(name_key),
+       name = VALUES(name),
+       min_price = VALUES(min_price),
+       image_url = VALUES(image_url),
+       name_color = VALUES(name_color),
+       category_id = VALUES(category_id),
+       created_by = VALUES(created_by),
+       created_by_login = VALUES(created_by_login),
+       created_at = CURRENT_TIMESTAMP(3)`,
+    [
+      randomUUID(),
+      sourceKey,
+      resource.name.toLowerCase(),
+      resource.name,
+      resource.min_price,
+      resource.image_url,
+      resource.name_color,
+      resource.category_id,
+      actor?.sub ?? null,
+      actor?.login ?? null,
+    ],
+  );
+}
+
+export interface BulkDeleteResult {
+  deleted: ResourceDto[];
+}
+
+/** Массовое удаление: те же правила, что и у одиночного (стоп-лист на каждый). */
+export async function deleteResources(
+  ids: readonly string[],
+  actor?: AuthPayload,
+): Promise<BulkDeleteResult> {
+  const unique = [...new Set(ids.filter(Boolean))];
+
+  if (unique.length === 0) {
+    throw new HttpError(400, 'Не выбрано ни одного предмета');
+  }
+
+  if (unique.length > 200) {
+    throw new HttpError(400, 'За один раз можно удалить не больше 200 предметов');
+  }
+
+  const db = await getDb();
+  const rows = await db.query<ResourceRow & { source_key: string | null }>(
+    `SELECT r.id,
+            r.name,
+            r.name_color,
+            r.min_price,
+            r.image_url,
+            r.category_id,
+            r.source_key,
+            c.name AS category_name,
+            r.created_at,
+            r.updated_at
+       FROM resources AS r
+       LEFT JOIN categories AS c ON c.id = r.category_id
+      WHERE r.id IN (?)`,
+    [unique],
+  );
+
+  const extras = await loadExtraCategories(unique);
+  const items = rows.rows.map((row) => toDto(row, extras.get(row.id) ?? []));
+
+  if (items.length === 0) {
+    throw new HttpError(404, 'Выбранные предметы не найдены');
+  }
+
+  const sourceKeyById = new Map(
+    rows.rows.map((row) => [row.id, row.source_key ?? null] as const),
+  );
+
+  await db.transaction(async (tx) => {
+    for (const item of items) {
+      await insertExclusion(tx, item, sourceKeyById.get(item.id) ?? null, actor);
+    }
+
+    const deletedIds = items.map((item) => item.id);
+    await tx.query('DELETE FROM resource_categories WHERE resource_id IN (?)', [deletedIds]);
+    await tx.query('DELETE FROM resources WHERE id IN (?)', [deletedIds]);
+  });
+
+  invalidateResourceListCache();
+
+  return { deleted: items };
 }
 
 export interface ExcludedResourceDto {

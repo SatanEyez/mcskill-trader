@@ -1,3 +1,8 @@
+export interface ResourceCategoryRef {
+  id: string;
+  name: string;
+}
+
 export interface Resource {
   id: string;
   name: string;
@@ -8,6 +13,10 @@ export interface Resource {
   category_id: string | null;
   /** Название категории для отображения («Без категории» при category_id = null). */
   category: string;
+  /** Все категории предмета: основная первой. */
+  categories: ResourceCategoryRef[];
+  /** Идентификаторы всех категорий в том же порядке. */
+  category_ids: string[];
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +41,8 @@ export interface ResourceInput {
   min_price: number;
   image_url: string;
   category_id: string | null;
+  /** Все категории предмета (основная первой). Если передано — важнее category_id. */
+  category_ids?: string[];
 }
 
 export interface ResourceStats {

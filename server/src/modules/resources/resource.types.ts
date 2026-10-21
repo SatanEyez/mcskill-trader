@@ -13,6 +13,12 @@ export interface ResourceRow {
   total_count?: string | number;
 }
 
+/** Короткая ссылка на категорию для отображения бейджей в интерфейсе. */
+export interface ResourceCategoryRef {
+  id: string;
+  name: string;
+}
+
 export interface ResourceDto {
   id: string;
   name: string;
@@ -23,6 +29,10 @@ export interface ResourceDto {
   category_id: string | null;
   /** Название категории для отображения. null-категория → «Без категории». */
   category: string;
+  /** Все категории ресурса: основная первой, дальше дополнительные. */
+  categories: ResourceCategoryRef[];
+  /** Идентификаторы всех категорий в том же порядке, что и `categories`. */
+  category_ids: string[];
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +51,11 @@ export interface ResourceInput {
   min_price: number;
   image_url: string;
   category_id: string | null;
+  /**
+   * Все категории ресурса (основная первой). Если передано, важнее чем
+   * устаревшее одиночное поле `category_id`.
+   */
+  category_ids?: string[] | null;
 }
 
 export type ResourceUpdate = Partial<ResourceInput>;

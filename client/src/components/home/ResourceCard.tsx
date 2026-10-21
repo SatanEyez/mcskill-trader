@@ -11,6 +11,11 @@ interface ResourceCardProps {
 }
 
 export function ResourceCard({ resource, onUse }: ResourceCardProps) {
+  const categories = resource.categories?.length
+    ? resource.categories
+    : [{ id: resource.category_id ?? 'none', name: resource.category }];
+  const [primaryCategory, ...extraCategories] = categories;
+
   return (
     <button
       type="button"
@@ -28,12 +33,22 @@ export function ResourceCard({ resource, onUse }: ResourceCardProps) {
           <ItemImage src={resource.image_url} alt={resource.name} className="h-full w-full" />
         </span>
 
-        <span
-          className={`inline-flex max-w-[55%] items-center truncate rounded-full border px-2.5 py-1 text-[10px] font-medium ${categoryStyle(resource.category)}`}
-          title={resource.category}
-        >
-          {resource.category}
-        </span>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+          <span
+            className={`inline-flex max-w-[130px] items-center truncate rounded-full border px-2.5 py-1 text-[10px] font-medium ${categoryStyle(primaryCategory?.name ?? resource.category)}`}
+            title={categories.map((item) => item.name).join(', ')}
+          >
+            {primaryCategory?.name ?? resource.category}
+          </span>
+          {extraCategories.length > 0 && (
+            <span
+              className="inline-flex shrink-0 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-1.5 py-1 text-[10px] font-medium text-slate-400"
+              title={extraCategories.map((item) => item.name).join(', ')}
+            >
+              +{extraCategories.length}
+            </span>
+          )}
+        </div>
       </div>
 
       <h3

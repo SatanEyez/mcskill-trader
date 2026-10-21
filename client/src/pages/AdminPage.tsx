@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useResourceFeed } from '../hooks/useResourceFeed';
@@ -18,7 +19,12 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import type { ExcludedResource, Resource } from '../types';
 import { formatDate, formatDateTimeMsk, formatPrice } from '../lib/format';
-import { ApiError, fetchExcludedResources, restoreExcludedResource } from '../lib/api';
+import {
+  ApiError,
+  deleteResources,
+  fetchExcludedResources,
+  restoreExcludedResource,
+} from '../lib/api';
 import { readableNameColor } from '../lib/color';
 import { categoryStyle } from '../lib/constants';
 import { AdminHeader } from '../components/admin/AdminHeader';
@@ -27,10 +33,18 @@ import { AdminStats } from '../components/admin/AdminStats';
 import { ResourceFormModal } from '../components/admin/ResourceFormModal';
 import { DeleteResourceDialog } from '../components/admin/DeleteResourceDialog';
 import { ItemImage } from '../components/ui/ItemImage';
+import { Modal } from '../components/ui/Modal';
 import { PageLoader, Spinner } from '../components/ui/Spinner';
 import { Pagination } from '../components/ui/Pagination';
 
 const PAGE_SIZE = 40;
+
+/** Категории для бейджей: все, а у старых ответов — хотя бы основная. */
+function categoriesOf(resource: Resource) {
+  return resource.categories?.length
+    ? resource.categories
+    : [{ id: resource.category_id ?? 'none', name: resource.category }];
+}
 
 export function AdminPage() {
   const { categories, reload: reloadCategories } = useCategories();
@@ -47,6 +61,10 @@ export function AdminPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [deletingResource, setDeletingResource] = useState<Resource | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [excluded, setExcluded] = useState<ExcludedResource[]>([]);
   const [excludedOpen, setExcludedOpen] = useState(false);
@@ -107,6 +125,63 @@ export function AdminPage() {
   useEffect(() => {
     void loadExcluded(true);
   }, [loadExcluded]);
+
+  // Смена фильтра или страницы сбрасывает выделение — иначе можно удалить
+  // предметы, которых уже не видно в списке.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [search, categoryId, page]);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+
+      return next;
+    });
+  };
+
+  const allVisibleSelected =
+    resources.length > 0 && resources.every((item) => selectedIds.has(item.id));
+
+  const toggleAllVisible = () => {
+    setSelectedIds((current) => {
+      const everySelected = resources.every((item) => current.has(item.id));
+
+      return everySelected ? new Set() : new Set(resources.map((item) => item.id));
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || bulkDeleting) return;
+
+    setBulkDeleting(true);
+
+    try {
+      const result = await deleteResources([...selectedIds]);
+      notify(
+        result.count === 1 ? 'Предмет удалён из каталога' : `Удалено предметов: ${result.count}`,
+        'success',
+      );
+      setBulkDeleteOpen(false);
+      setSelectedIds(new Set());
+      void reload({ silent: true });
+      void reloadStats();
+      void reloadCategories({ silent: true });
+      void loadExcluded(true);
+    } catch (deleteError) {
+      notify(
+        deleteError instanceof ApiError
+          ? deleteError.message
+          : 'Не удалось удалить выбранные предметы',
+        'error',
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const openCreate = () => {
     setEditingResource(null);
@@ -292,6 +367,32 @@ export function AdminPage() {
                   </button>
                 )}
               </div>
+
+              {selectedIds.size > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rose-500/20 bg-rose-500/[0.06] px-3 py-2">
+                  <span className="text-[11px] font-medium text-rose-200">
+                    Выбрано: {selectedIds.size}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds(new Set())}
+                      className="btn btn-secondary px-2.5 py-1.5 text-[11px]"
+                    >
+                      <X className="h-3 w-3" aria-hidden />
+                      Снять
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkDeleteOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1.5 text-[11px] font-medium text-rose-200 transition hover:bg-rose-500/20"
+                    >
+                      <Trash2 className="h-3 w-3" aria-hidden />
+                      Удалить выбранные
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="panel mt-4 overflow-hidden">
@@ -326,6 +427,15 @@ export function AdminPage() {
                     <table className="w-full min-w-[760px] text-left text-sm">
                       <thead>
                         <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                          <th scope="col" className="w-10 px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={allVisibleSelected}
+                              onChange={toggleAllVisible}
+                              className="h-4 w-4 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
+                              aria-label="Выбрать все предметы на странице"
+                            />
+                          </th>
                           <th scope="col" className="px-4 py-3 font-semibold">
                             Ресурс
                           </th>
@@ -345,7 +455,22 @@ export function AdminPage() {
                       </thead>
                       <tbody className="divide-y divide-white/[0.04]">
                         {resources.map((resource) => (
-                          <tr key={resource.id} className="group transition hover:bg-white/[0.02]">
+                          <tr
+                            key={resource.id}
+                            className={clsx(
+                              'group transition hover:bg-white/[0.02]',
+                              selectedIds.has(resource.id) && 'bg-rose-500/[0.04]',
+                            )}
+                          >
+                            <td className="px-3 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(resource.id)}
+                                onChange={() => toggleSelected(resource.id)}
+                                className="h-4 w-4 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
+                                aria-label={`Выбрать ${resource.name}`}
+                              />
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
@@ -369,11 +494,16 @@ export function AdminPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${categoryStyle(resource.category)}`}
-                              >
-                                {resource.category}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {categoriesOf(resource).map((category) => (
+                                  <span
+                                    key={category.id}
+                                    className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-medium ${categoryStyle(category.name)}`}
+                                  >
+                                    {category.name}
+                                  </span>
+                                ))}
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-right">
                               <span className="font-display text-sm font-semibold text-accent-300">
@@ -415,7 +545,20 @@ export function AdminPage() {
                   {/* Карточки для телефона */}
                   <div className="divide-y divide-white/[0.05] md:hidden">
                     {resources.map((resource) => (
-                      <div key={resource.id} className="flex items-start gap-3 p-4">
+                      <div
+                        key={resource.id}
+                        className={clsx(
+                          'flex items-start gap-3 p-4',
+                          selectedIds.has(resource.id) && 'bg-rose-500/[0.04]',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(resource.id)}
+                          onChange={() => toggleSelected(resource.id)}
+                          className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
+                          aria-label={`Выбрать ${resource.name}`}
+                        />
                         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
                           <ItemImage
                             src={resource.image_url}
@@ -432,11 +575,14 @@ export function AdminPage() {
                             {resource.name}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-medium ${categoryStyle(resource.category)}`}
-                            >
-                              {resource.category}
-                            </span>
+                            {categoriesOf(resource).map((category) => (
+                              <span
+                                key={category.id}
+                                className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-medium ${categoryStyle(category.name)}`}
+                              >
+                                {category.name}
+                              </span>
+                            ))}
                             <span className="text-[11px] font-semibold text-accent-300">
                               {formatPrice(resource.min_price)} монет
                             </span>
@@ -592,6 +738,44 @@ export function AdminPage() {
         onClose={() => setDeletingResource(null)}
         onDeleted={handleDeleted}
       />
+
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => {
+          if (!bulkDeleting) setBulkDeleteOpen(false);
+        }}
+        title="Удалить выбранные предметы?"
+        description="Предметы исчезнут из каталога и попадут в стоп-лист импорта."
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteOpen(false)}
+              className="btn btn-secondary"
+              disabled={bulkDeleting}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleBulkDelete()}
+              disabled={bulkDeleting}
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/15 px-4 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/25 disabled:opacity-60"
+            >
+              {bulkDeleting ? <Spinner /> : <Trash2 className="h-4 w-4" aria-hidden />}
+              Удалить {selectedIds.size}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-slate-400">
+          Будет удалено предметов:{' '}
+          <span className="font-semibold text-white">{selectedIds.size}</span>. Они перестанут
+          показываться в каталоге и в трейд-калькуляторе, а импорт прайса не вернёт их обратно.
+          При необходимости предметы можно вернуть в разделе «Удалённые предметы».
+        </p>
+      </Modal>
     </div>
   );
 }

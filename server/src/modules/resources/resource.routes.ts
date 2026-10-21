@@ -3,6 +3,7 @@ import { requireAdmin } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/permission.js';
 import { validate } from '../../middleware/validate.js';
 import {
+  bulkDeleteResources,
   createResource,
   deleteResource,
   getCatalog,
@@ -15,6 +16,7 @@ import {
   updateResource,
 } from './resource.controller.js';
 import {
+  bulkDeleteResourcesSchema,
   createResourceSchema,
   listResourcesQuerySchema,
   updateResourceSchema,
@@ -44,6 +46,14 @@ resourceRouter.delete(
   requireAdmin,
   requirePermission('resources.delete'),
   removeExcludedResource,
+);
+// Массовое удаление — строго до /:id, чтобы «bulk-delete» не улетел в getId.
+resourceRouter.post(
+  '/bulk-delete',
+  requireAdmin,
+  requirePermission('resources.delete'),
+  validate(bulkDeleteResourcesSchema),
+  bulkDeleteResources,
 );
 resourceRouter.get('/:id', getResource);
 

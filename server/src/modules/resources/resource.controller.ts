@@ -48,6 +48,13 @@ function describeChanges(previous: ResourceDto, next: ResourceDto): Record<strin
     changes.category = { from: previous.category, to: next.category };
   }
 
+  const previousCategories = previous.categories.map((item) => item.name).join(', ');
+  const nextCategories = next.categories.map((item) => item.name).join(', ');
+
+  if (previousCategories !== nextCategories) {
+    changes.categories = { from: previousCategories, to: nextCategories };
+  }
+
   return changes;
 }
 
@@ -93,6 +100,7 @@ export const createResource: RequestHandler = asyncHandler(async (req, res) => {
     details: {
       min_price: data.min_price,
       category: data.category,
+      categories: data.categories.map((item) => item.name).join(', '),
       image_url: data.image_url,
       name_color: data.name_color,
     },
@@ -138,6 +146,35 @@ export const deleteResource: RequestHandler = asyncHandler(async (req, res) => {
   });
 
   res.json({ data: { id: deleted.id } });
+});
+
+export const bulkDeleteResources: RequestHandler = asyncHandler(async (req, res) => {
+  const body = req.validatedBody as { ids: string[] };
+  const result = await resourceService.deleteResources(body.ids, req.auth!);
+  const label =
+    result.deleted.length === 1
+      ? result.deleted[0]!.name
+      : `Удалено предметов: ${result.deleted.length}`;
+
+  await logAction(req, {
+    action: 'resource.delete',
+    entityType: 'resource',
+    entityId: null,
+    entityLabel: label,
+    details: {
+      bulk: true,
+      count: result.deleted.length,
+      ids: result.deleted.map((item) => item.id),
+      names: result.deleted.slice(0, 50).map((item) => item.name),
+    },
+  });
+
+  res.json({
+    data: {
+      deleted: result.deleted.map((item) => item.id),
+      count: result.deleted.length,
+    },
+  });
 });
 
 export const listExcludedResources: RequestHandler = asyncHandler(async (_req, res) => {
