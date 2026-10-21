@@ -38,14 +38,16 @@ const GIVE: DemoItem[] = [
 
 const RECEIVE: DemoItem[] = [
   { name: 'Звезда', qty: 3, price: 42_000, icon: '/items/nether_star.png' },
-  { name: 'Тотем', qty: 1, price: 7_500, icon: '/items/totem_of_undying.png' },
+  { name: 'Тотем', qty: 1, price: 4_500, icon: '/items/totem_of_undying.png' },
 ];
 
 const TOTAL_GIVE = GIVE.reduce((sum, item) => sum + item.price, 0);
 const TOTAL_RECEIVE = RECEIVE.reduce((sum, item) => sum + item.price, 0);
 const TOTAL_SUM = TOTAL_GIVE + TOTAL_RECEIVE;
+const TOTAL_MIN = Math.min(TOTAL_GIVE, TOTAL_RECEIVE);
 const GAP = Math.abs(TOTAL_RECEIVE - TOTAL_GIVE);
-const GAP_PERCENT = (GAP / TOTAL_SUM) * 100;
+// Как в калькуляторе: процент считается от меньшей стороны сделки.
+const GAP_PERCENT = (GAP / TOTAL_MIN) * 100;
 const SHARE_GIVE = TOTAL_GIVE / TOTAL_SUM;
 const GAP_TEXT = `${GAP_PERCENT.toFixed(1).replace('.', ',')}%`;
 

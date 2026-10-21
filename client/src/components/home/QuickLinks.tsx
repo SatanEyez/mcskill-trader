@@ -60,7 +60,7 @@ export function QuickLinks({ resourceCount }: QuickLinksProps) {
           <h2 className="mt-4 text-base font-semibold text-white">Трейд-калькулятор</h2>
           <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
             Соберите обе стороны сделки и узнайте, проходит ли обмен по правилу 9.10 —
-            разница до 10% от итоговой суммы.
+            разница до 10% от меньшей стороны.
           </p>
         </Link>
       </div>
