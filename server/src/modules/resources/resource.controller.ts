@@ -162,3 +162,18 @@ export const restoreExcludedResource: RequestHandler = asyncHandler(async (req, 
 
   res.json({ data });
 });
+
+export const removeExcludedResource: RequestHandler = asyncHandler(async (req, res) => {
+  const removed = await resourceService.removeExcludedResource(
+    requireUuid(req.params.id as string, 'идентификатор удалённого предмета'),
+  );
+
+  await logAction(req, {
+    action: 'resource.exclusion_delete',
+    entityType: 'resource',
+    entityId: removed.id,
+    entityLabel: removed.name,
+  });
+
+  res.json({ data: { id: removed.id } });
+});

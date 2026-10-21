@@ -52,7 +52,7 @@ export function DeleteResourceDialog({ resource, onClose, onDeleted }: DeleteRes
       open={Boolean(resource)}
       onClose={handleClose}
       title="Удалить ресурс?"
-      description="Действие необратимо: предмет исчезнет из каталога и калькулятора."
+      description="Предмет исчезнет из каталога и калькулятора и попадёт в «Удалённые предметы» — оттуда его можно вернуть. Импорт прайса его не восстановит."
       size="sm"
       footer={
         <>

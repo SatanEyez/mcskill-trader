@@ -219,6 +219,7 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 | POST/PUT/DELETE | `/resources`, `/resources/:id` | Bearer |
 | GET | `/resources/exclusions` | Bearer, право `resources.delete` (стоп-лист импорта) |
 | POST | `/resources/exclusions/:id/restore` | Bearer, право `resources.delete` (вернуть предмет в каталог) |
+| DELETE | `/resources/exclusions/:id` | Bearer, право `resources.delete` (убрать запись из стоп-листа) |
 | POST | `/trade/calculate` | public |
 | POST | `/uploads` | Bearer (multipart, поле `image`: PNG/JPG/WebP/GIF, до 5 МБ → `{ url, filename, mime, size }`; файл хранится в базе) |
 | GET | `/uploads/:file` | public (иконка прайса из git или файл из базы) |

@@ -10,6 +10,7 @@ import {
   getStats,
   listExcludedResources,
   listResources,
+  removeExcludedResource,
   restoreExcludedResource,
   updateResource,
 } from './resource.controller.js';
@@ -37,6 +38,12 @@ resourceRouter.post(
   requireAdmin,
   requirePermission('resources.delete'),
   restoreExcludedResource,
+);
+resourceRouter.delete(
+  '/exclusions/:id',
+  requireAdmin,
+  requirePermission('resources.delete'),
+  removeExcludedResource,
 );
 resourceRouter.get('/:id', getResource);
 

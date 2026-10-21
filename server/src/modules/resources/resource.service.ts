@@ -455,3 +455,24 @@ export async function restoreExcludedResource(id: string): Promise<ResourceDto> 
 
   return getResourceById(resourceId);
 }
+
+/**
+ * Убирает предмет из стоп-листа, не возвращая его в каталог.
+ * Нужно, когда запись осталась от тестов или удалена по ошибке.
+ */
+export async function removeExcludedResource(id: string): Promise<{ id: string; name: string }> {
+  const db = await getDb();
+  const found = await db.query<{ id: string; name: string }>(
+    'SELECT id, name FROM import_exclusions WHERE id = ?',
+    [id],
+  );
+  const row = found.rows[0];
+
+  if (!row) {
+    throw new HttpError(404, 'Удалённый предмет не найден');
+  }
+
+  await db.query('DELETE FROM import_exclusions WHERE id = ?', [id]);
+
+  return row;
+}

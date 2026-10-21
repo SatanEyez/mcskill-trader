@@ -727,6 +727,45 @@ try {
   const afterResourceDelete = await api(`/resources/${resourceId}`);
   check('удалённый ресурс → 404', afterResourceDelete.status === 404);
 
+  section('Стоп-лист удалённых предметов');
+  const stopList = await api('/resources/exclusions', { token });
+  const excluded = (stopList.body?.data ?? []).find(
+    (item) => item.name === `Смоук-ресурс-${STAMP}`,
+  );
+  check('удалённый ресурс попал в стоп-лист импорта', Boolean(excluded), json(stopList.body));
+
+  if (excluded) {
+    const restoreExcluded = await api(`/resources/exclusions/${excluded.id}/restore`, {
+      method: 'POST',
+      token,
+    });
+    check(
+      'возврат из стоп-листа → 200 и ресурс снова в каталоге',
+      restoreExcluded.status === 200 &&
+        restoreExcluded.body?.data?.name === `Смоук-ресурс-${STAMP}`,
+      json(restoreExcluded.body),
+    );
+
+    const restoredId = restoreExcluded.body?.data?.id;
+    const afterRestore = await api(`/resources/${restoredId}`);
+    check('возвращённый ресурс доступен по /resources/:id', afterRestore.status === 200);
+
+    // Убираем за собой: удаляем ресурс и чистим стоп-лист.
+    await api(`/resources/${restoredId}`, { method: 'DELETE', token });
+    const cleanupList = await api('/resources/exclusions', { token });
+    const leftover = (cleanupList.body?.data ?? []).find(
+      (item) => item.name === `Смоук-ресурс-${STAMP}`,
+    );
+
+    if (leftover) {
+      const removed = await api(`/resources/exclusions/${leftover.id}`, {
+        method: 'DELETE',
+        token,
+      });
+      check('DELETE /resources/exclusions/:id → 200', removed.status === 200, json(removed.body));
+    }
+  }
+
   section('Загрузка изображений');
   // Пиксель 1×1 в PNG — минимальный валидный файл для проверки сигнатуры.
   const pxPng = Buffer.from(
