@@ -171,6 +171,19 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 из `mysql-connection.env` (phpMyAdmin читает этот же файл и сам включает TLS).
 Запуск: `php -S 127.0.0.1:8081 -t C:\Users\<user>\phpmyadmin-stack\phpmyadmin`.
 
+### Что переживает перезаливку и деплой
+
+| Данные | Где хранятся |
+|---|---|
+| Ресурсы, цены, категории, администраторы, роли, журнал, обращения | база MySQL/TiDB |
+| Аватары профилей и картинки, загруженные через админку | база (`uploaded_files`, MEDIUMBLOB) |
+| Иконки прайса (9 252 шт.) | git (`server/uploads/prices/`), отдаются статикой |
+
+Диск контейнера на Render эфемерный, поэтому `POST /api/uploads` больше не пишет файлы на диск:
+тело файла сохраняется в базе, а `/uploads/<uuid>.<ext>` читается из неё. Иконки прайса
+по-прежнему лежат в git и отдаются статикой. `mysql-connection.env` в git не попадает:
+на хостинге задайте `MYSQL_*` переменными окружения.
+
 ## API
 
 База: `/api`. Успех — `{ data, meta? }`, ошибка — `{ error: { message, details? } }`.
@@ -185,7 +198,9 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 | GET | `/users?status=` | Bearer (`pending` / `approved` / `rejected`) |
 | POST | `/users/:id/approve`, `/users/:id/reject` | Bearer |
 | PUT | `/users/:id/role` | Bearer, только `owner` (`{ role }` = `owner` / `admin`) |
-| DELETE | `/users/:id` | Bearer (одобренных администраторов — только `owner`) |
+| PUT | `/users/me/avatar` | Bearer (multipart, поле `avatar`: PNG/JPG/WebP/GIF, до 2 МБ) |
+| DELETE | `/users/me/avatar` | Bearer |
+| DELETE | `/users/:id` | Bearer, право `users.delete` (владельца и системный аккаунт удалить нельзя) |
 | GET | `/audit?group=&period=&user_id=&search=&limit=&offset=` | Bearer |
 | GET | `/categories` | public (со `resource_count`) |
 | POST/PUT/DELETE | `/categories`, `/categories/:id` | Bearer |
@@ -193,8 +208,8 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 | GET | `/resources/:id` | public |
 | POST/PUT/DELETE | `/resources`, `/resources/:id` | Bearer |
 | POST | `/trade/calculate` | public |
-| POST | `/uploads` | Bearer (multipart, поле `image`: PNG/JPG/WebP/GIF, до 5 МБ → `{ url, filename, mime, size }`) |
-| GET | `/uploads/:file` | public (раздача картинок) |
+| POST | `/uploads` | Bearer (multipart, поле `image`: PNG/JPG/WebP/GIF, до 5 МБ → `{ url, filename, mime, size }`; файл хранится в базе) |
+| GET | `/uploads/:file` | public (иконка прайса из git или файл из базы) |
 
 ### Трейд-расчёт
 

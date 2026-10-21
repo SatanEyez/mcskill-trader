@@ -1,6 +1,13 @@
 import type { Request, RequestHandler } from 'express';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { HttpError } from '../../utils/http-error.js';
 import { logAction } from '../audit/audit.service.js';
+import {
+  UPLOADS_URL_PREFIX,
+  deleteUploadedFile,
+  detectImageMime,
+  saveUploadedFile,
+} from '../uploads/upload.storage.js';
 import * as userService from './user.service.js';
 import type {
   UpdateUserAccessInput,
@@ -57,6 +64,60 @@ export const deleteUser: RequestHandler = asyncHandler(async (req, res) => {
     entityId: data.id,
     entityLabel: data.login,
     details: { login: data.login, status: data.status },
+  });
+
+  res.json({ data });
+});
+
+/** Аватар своего профиля: файл кладём в базу, в admin_users — только ссылку. */
+export const updateAvatar: RequestHandler = asyncHandler(async (req, res) => {
+  const file = req.file;
+
+  if (!file) {
+    throw new HttpError(422, 'Выберите файл изображения');
+  }
+
+  const mime = detectImageMime(file.buffer);
+
+  if (!mime) {
+    throw new HttpError(422, 'Файл не похож на изображение: нужен PNG, JPG, WebP или GIF');
+  }
+
+  const previous = await userService.getUserById(req.auth!.sub);
+  const filename = await saveUploadedFile(file.buffer, mime);
+  const data = await userService.setUserAvatar(
+    req.auth!.sub,
+    `${UPLOADS_URL_PREFIX}/${filename}`,
+  );
+
+  if (previous.avatar_url) {
+    await deleteUploadedFile(previous.avatar_url.replace(`${UPLOADS_URL_PREFIX}/`, ''));
+  }
+
+  await logAction(req, {
+    action: 'user.avatar_update',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
+    details: { mime, size: file.buffer.length },
+  });
+
+  res.json({ data });
+});
+
+export const deleteAvatar: RequestHandler = asyncHandler(async (req, res) => {
+  const previous = await userService.getUserById(req.auth!.sub);
+  const data = await userService.setUserAvatar(req.auth!.sub, '');
+
+  if (previous.avatar_url) {
+    await deleteUploadedFile(previous.avatar_url.replace(`${UPLOADS_URL_PREFIX}/`, ''));
+  }
+
+  await logAction(req, {
+    action: 'user.avatar_delete',
+    entityType: 'user',
+    entityId: data.id,
+    entityLabel: data.login,
   });
 
   res.json({ data });

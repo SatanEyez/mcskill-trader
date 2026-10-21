@@ -19,7 +19,11 @@ import { resourceRouter } from './modules/resources/resource.routes.js';
 import { supportRouter } from './modules/support/support.routes.js';
 import { tradeRouter } from './modules/trade/trade.routes.js';
 import { uploadRouter } from './modules/uploads/upload.routes.js';
-import { UPLOADS_DIR, UPLOADS_URL_PREFIX } from './modules/uploads/upload.storage.js';
+import {
+  UPLOADS_DIR,
+  UPLOADS_URL_PREFIX,
+  findUploadedFile,
+} from './modules/uploads/upload.storage.js';
 import { userRouter } from './modules/users/user.routes.js';
 import { asyncHandler } from './utils/async-handler.js';
 
@@ -77,13 +81,30 @@ export function createApp(): Express {
   app.use('/api/presence', presenceRouter);
   app.use('/api', notFound);
 
-  // Загруженные картинки отдаём и в dev, и в проде: Vite проксирует /uploads на API.
+  // Иконки прайса лежат в git и отдаются статикой (и в dev, и в проде:
+  // Vite проксирует /uploads на API). Остальные загрузки — из базы.
   app.use(
     UPLOADS_URL_PREFIX,
     express.static(UPLOADS_DIR, {
       index: false,
       maxAge: isProduction ? '30d' : 0,
       immutable: isProduction,
+    }),
+  );
+
+  app.get(
+    `${UPLOADS_URL_PREFIX}/:file`,
+    asyncHandler(async (req, res) => {
+      const file = await findUploadedFile(req.params.file ?? '');
+
+      if (!file) {
+        res.status(404).json({ error: { message: 'Файл не найден' } });
+        return;
+      }
+
+      res.setHeader('Content-Type', file.mime);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(file.data);
     }),
   );
 

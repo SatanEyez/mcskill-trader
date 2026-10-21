@@ -64,6 +64,7 @@ export interface AdminUser {
   prefix: AdminPrefix | null;
   is_system: boolean;
   discord: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
   reviewed_at: string | null;

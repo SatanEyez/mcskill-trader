@@ -206,16 +206,18 @@ export function AdminAccessPage() {
                       </div>
 
                       <div className="flex shrink-0 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setRoleModal({ open: true, role })}
-                          disabled={!canRoles || role.code === 'owner'}
-                          className="icon-btn"
-                          title={`Редактировать роль «${role.name}»`}
-                          aria-label={`Редактировать роль ${role.name}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" aria-hidden />
-                        </button>
+                        {role.code !== 'owner' && (
+                          <button
+                            type="button"
+                            onClick={() => setRoleModal({ open: true, role })}
+                            disabled={!canRoles}
+                            className="icon-btn"
+                            title={`Редактировать роль «${role.name}»`}
+                            aria-label={`Редактировать роль ${role.name}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setConfirm({ type: 'role', item: role })}

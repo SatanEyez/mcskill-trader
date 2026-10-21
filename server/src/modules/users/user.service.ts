@@ -32,6 +32,7 @@ const USER_SELECT = `
          u.prefix_id,
          u.is_system,
          u.discord,
+         u.avatar_url,
          u.created_at,
          u.updated_at,
          u.reviewed_at,
@@ -67,6 +68,7 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
         : null,
     is_system: Boolean(row.is_system),
     discord: row.discord,
+    avatar_url: row.avatar_url || null,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
     reviewed_at: row.reviewed_at ? toIso(row.reviewed_at) : null,
@@ -242,6 +244,20 @@ export async function updatePasswordHash(id: string, passwordHash: string): Prom
       WHERE id = ?`,
     [passwordHash, id],
   );
+}
+
+/** Ссылка на аватар (`/uploads/<uuid>.png`) или пустая строка, если его нет. */
+export async function setUserAvatar(id: string, avatarUrl: string): Promise<AdminUserDto> {
+  const db = await getDb();
+  await db.query(
+    `UPDATE admin_users
+        SET avatar_url = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
+    [avatarUrl, id],
+  );
+
+  return getUserById(id);
 }
 
 export async function approveUser(id: string, actor: AuthPayload): Promise<AdminUserDto> {

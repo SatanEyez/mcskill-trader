@@ -13,6 +13,7 @@ import { AdminLogsPage } from './pages/AdminLogsPage';
 import { AdminAccessPage } from './pages/AdminAccessPage';
 import { AdminSupportPage } from './pages/AdminSupportPage';
 import { AdminImportPage } from './pages/AdminImportPage';
+import { AdminProfilePage } from './pages/AdminProfilePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminHeader } from './components/admin/AdminHeader';
 import { AdminTabs } from './components/admin/AdminTabs';
@@ -119,6 +120,14 @@ export function App() {
                   <RequirePermission permission="resources.read">
                     <AdminPage />
                   </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/profile"
+              element={
+                <RequireAdmin>
+                  <AdminProfilePage />
                 </RequireAdmin>
               }
             />

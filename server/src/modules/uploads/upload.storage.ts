@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from '../../config/env.js';
+import { getDb } from '../../db/index.js';
 
 /**
  * Каталог загруженных изображений. Лежит вне client/dist — переживает пересборку фронта.
@@ -65,4 +67,58 @@ export function detectImageMime(buffer: Buffer): AllowedImageMime | null {
   }
 
   return null;
+}
+
+/**
+ * Файлы из админки храним в базе (`uploaded_files`), а не на диске:
+ * на Render файловая система контейнера пересоздаётся при каждом деплое.
+ * Иконки прайса при этом лежат в git и отдаются статикой.
+ */
+export interface StoredFile {
+  name: string;
+  mime: string;
+  size: number;
+  data: Buffer;
+}
+
+/** Имена генерируем сами: UUID + расширение. Чужие имена в базу не попадут. */
+const STORED_NAME_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp|gif)$/i;
+
+export function isStoredFileName(name: string): boolean {
+  return STORED_NAME_PATTERN.test(name);
+}
+
+/** Сохраняет картинку в базу и возвращает её имя для URL `/uploads/<name>`. */
+export async function saveUploadedFile(
+  buffer: Buffer,
+  mime: AllowedImageMime,
+): Promise<string> {
+  const db = await getDb();
+  const name = `${randomUUID()}${extensionForMime(mime)}`;
+
+  await db.query(
+    'INSERT INTO uploaded_files (name, mime, size, data) VALUES (?, ?, ?, ?)',
+    [name, mime, buffer.length, buffer],
+  );
+
+  return name;
+}
+
+export async function findUploadedFile(name: string): Promise<StoredFile | null> {
+  if (!isStoredFileName(name)) return null;
+
+  const db = await getDb();
+  const result = await db.query<StoredFile>(
+    'SELECT name, mime, size, data FROM uploaded_files WHERE name = ?',
+    [name],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function deleteUploadedFile(name: string): Promise<void> {
+  if (!isStoredFileName(name)) return;
+
+  const db = await getDb();
+  await db.query('DELETE FROM uploaded_files WHERE name = ?', [name]);
 }

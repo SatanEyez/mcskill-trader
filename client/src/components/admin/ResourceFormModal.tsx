@@ -283,7 +283,7 @@ export function ResourceFormModal({
                     id="resource-price"
                     value={form.price}
                     onChange={(event) =>
-                      updateField('price', event.target.value.replace(/[^\d.,]/g, '').slice(0, 12))
+                      updateField('price', event.target.value.replace(/[^\d.,]/g, '').slice(0, 24))
                     }
                     inputMode="decimal"
                     placeholder="1200"

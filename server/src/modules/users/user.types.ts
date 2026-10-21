@@ -28,6 +28,7 @@ export interface AdminUserRow {
   prefix_id: string | null;
   is_system: boolean;
   discord: string | null;
+  avatar_url: string;
   created_at: Date | string;
   updated_at: Date | string;
   password_changed_at: Date | string;
@@ -51,6 +52,7 @@ export interface AdminUserDto {
   prefix: AdminPrefixDto | null;
   is_system: boolean;
   discord: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
   reviewed_at: string | null;

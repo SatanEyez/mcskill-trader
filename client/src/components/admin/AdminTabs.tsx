@@ -6,6 +6,7 @@ import {
   Upload,
   UsersRound,
   MessageSquareWarning,
+  UserRound,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { NavLink } from 'react-router-dom';
@@ -21,6 +22,8 @@ interface Tab {
   permission: string;
   /** Второе право, если достаточно любого из двух. */
   anyPermission?: string;
+  /** Вкладка видна любому действующему администратору. */
+  alwaysVisible?: boolean;
 }
 
 const TABS: Tab[] = [
@@ -38,6 +41,14 @@ const TABS: Tab[] = [
   },
   { to: '/admin/import', label: 'Импорт', icon: Upload, end: false, permission: 'import.run' },
   { to: '/admin/logs', label: 'Логи', icon: ScrollText, end: false, permission: 'logs.read' },
+  {
+    to: '/admin/profile',
+    label: 'Профиль',
+    icon: UserRound,
+    end: false,
+    permission: 'dashboard.view',
+    alwaysVisible: true,
+  },
 ];
 
 export function AdminTabs() {
@@ -48,7 +59,10 @@ export function AdminTabs() {
   const { counts } = useTicketStats(canSeeSupport);
 
   const visible = TABS.filter(
-    (tab) => can(tab.permission) || (tab.anyPermission ? can(tab.anyPermission) : false),
+    (tab) =>
+      tab.alwaysVisible ||
+      can(tab.permission) ||
+      (tab.anyPermission ? can(tab.anyPermission) : false),
   );
 
   if (visible.length === 0) return null;

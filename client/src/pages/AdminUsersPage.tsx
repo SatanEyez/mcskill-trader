@@ -152,11 +152,10 @@ export function AdminUsersPage() {
   };
 
   const canDelete = (target: AdminUser): boolean =>
-    can('users.write') &&
+    can('users.delete') &&
     target.role !== 'owner' &&
     !target.is_system &&
-    target.id !== currentUser?.id &&
-    target.status !== 'approved';
+    target.id !== currentUser?.id;
 
   /** Гибкие роли и префиксы меняет носитель права users.roles. */
   const canManageRoles = (target: AdminUser): boolean =>
@@ -411,11 +410,20 @@ export function AdminUsersPage() {
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <span
                         className={clsx(
-                          'grid h-10 w-10 shrink-0 place-items-center rounded-lg border text-sm font-semibold uppercase',
+                          'grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border text-sm font-semibold uppercase',
                           AVATAR_META[target.status],
                         )}
                       >
-                        {target.login.slice(0, 1)}
+                        {target.avatar_url ? (
+                          <img
+                            src={target.avatar_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            aria-hidden
+                          />
+                        ) : (
+                          target.login.slice(0, 1)
+                        )}
                       </span>
 
                       <div className="min-w-0 flex-1">
@@ -561,8 +569,9 @@ export function AdminUsersPage() {
         </div>
 
         <p className="mt-4 text-[11px] leading-relaxed text-slate-600">
-          Одобрять заявки может администратор с правом users.write. Роли и префиксы выдаёт
-          носитель права users.roles. Пароль хранится в виде scrypt-хеша.
+          Одобрять заявки может администратор с правом users.write, удалять аккаунты —
+          с правом users.delete. Роли и префиксы выдаёт носитель права users.roles.
+          Пароль хранится в виде scrypt-хеша.
         </p>
       </main>
 

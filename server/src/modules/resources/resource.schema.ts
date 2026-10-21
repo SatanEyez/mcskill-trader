@@ -12,7 +12,7 @@ const priceField = z.coerce
   .number({ invalid_type_error: 'Цена должна быть числом' })
   .finite('Цена должна быть числом')
   .positive('Цена должна быть больше нуля')
-  .max(1_000_000_000_000, 'Слишком большая цена')
+  .max(1_000_000_000_000_000_000_000, 'Слишком большая цена')
   .transform(roundMoney);
 
 const imageUrlField = z

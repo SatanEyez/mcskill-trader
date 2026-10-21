@@ -29,16 +29,29 @@ export function AdminHeader() {
 
         <div className="flex items-center gap-2">
           {user && (
-            <span className="hidden max-w-[220px] items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 sm:inline-flex">
+            <Link
+              to="/admin/profile"
+              className="hidden max-w-[220px] items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 transition hover:border-white/20 hover:bg-white/[0.05] sm:inline-flex"
+              title="Мой профиль"
+            >
               <span
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border text-[10px] font-semibold uppercase"
+                className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-lg border text-[10px] font-semibold uppercase"
                 style={{
                   color: prefixColor,
                   borderColor: `${prefixColor}55`,
                   backgroundColor: `${prefixColor}14`,
                 }}
               >
-                {user.login.slice(0, 1)}
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    aria-hidden
+                  />
+                ) : (
+                  user.login.slice(0, 1)
+                )}
               </span>
               <span className="min-w-0">
                 <span
@@ -53,7 +66,7 @@ export function AdminHeader() {
                   {roleLabel}
                 </span>
               </span>
-            </span>
+            </Link>
           )}
 
           <ChangePasswordButton />

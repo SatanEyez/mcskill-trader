@@ -202,6 +202,70 @@ export async function uploadImage(file: File): Promise<UploadedImage> {
   return (payload as { data: UploadedImage }).data;
 }
 
+/**
+ * Аватар своего профиля (multipart, поле `avatar`, до 2 МБ).
+ * Файл хранится в базе, поэтому переживает деплой.
+ */
+export async function uploadAvatar(file: File): Promise<AdminUser> {
+  const token = getStoredToken();
+
+  if (!token) {
+    throw new ApiError('Для доступа нужна авторизация', 401);
+  }
+
+  const body = new FormData();
+  body.append('avatar', file);
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE}/users/me/avatar`, {
+      method: 'PUT',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body,
+    });
+  } catch {
+    throw new ApiError('Не удалось связаться с сервером. Проверьте, что API запущено.', 0);
+  }
+
+  const text = await response.text();
+  let payload: unknown = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    const errorBody = payload as { error?: { message?: string; details?: unknown } } | null;
+
+    if (response.status === 401) {
+      clearStoredToken();
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
+
+    throw new ApiError(
+      errorBody?.error?.message ?? `Не удалось загрузить аватар (${response.status})`,
+      response.status,
+      errorBody?.error?.details,
+    );
+  }
+
+  return (payload as { data: AdminUser }).data;
+}
+
+export async function deleteAvatar(): Promise<AdminUser> {
+  const payload = await request<{ data: AdminUser }>('/users/me/avatar', {
+    method: 'DELETE',
+    auth: true,
+  });
+
+  return payload.data;
+}
+
 interface ResourceListParams {
   search?: string;
   category_id?: string;

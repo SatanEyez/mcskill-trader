@@ -2,11 +2,14 @@ import { Router } from 'express';
 import { requireAdmin } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/permission.js';
 import { validate } from '../../middleware/validate.js';
+import { createImageUploader } from '../uploads/upload.middleware.js';
 import {
   approveUser,
+  deleteAvatar,
   deleteUser,
   listUsers,
   rejectUser,
+  updateAvatar,
   updateUserAccess,
   updateUserRole,
 } from './user.controller.js';
@@ -21,6 +24,10 @@ export const userRouter = Router();
 
 // Управление администраторами доступно только действующим администраторам.
 userRouter.use(requireAdmin);
+
+// Свой профиль: любой действующий администратор может сменить себе аватар.
+userRouter.put('/me/avatar', createImageUploader('avatar', 2 * 1024 * 1024), updateAvatar);
+userRouter.delete('/me/avatar', deleteAvatar);
 
 userRouter.get(
   '/',
@@ -57,7 +64,7 @@ userRouter.put(
 );
 userRouter.delete(
   '/:id',
-  requirePermission('users.write'),
+  requirePermission('users.delete'),
   validate(userIdParamSchema, 'params'),
   deleteUser,
 );
