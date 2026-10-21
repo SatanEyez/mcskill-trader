@@ -253,7 +253,7 @@ export function AdminProfilePage() {
                 <dt className="text-slate-500">Статус</dt>
                 <dd className="font-medium text-white">
                   {user.status === 'approved'
-                    ? `Одобрен (${user.reviewed_by_login ?? 'система'})`
+                    ? `Одобрен (${user.reviewed_by_login ?? 'при первом запуске'})`
                     : user.status}
                   {user.status === 'approved' && user.reviewed_at && (
                     <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
