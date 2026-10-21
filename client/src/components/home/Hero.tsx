@@ -2,6 +2,7 @@ import { Boxes, Calculator, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatPrice } from '../../lib/format';
 import { TradePreview } from './TradePreview';
+import { TradeRulesPromo } from './TradeRulesPromo';
 
 interface HeroProps {
   resourceCount: number;
@@ -95,6 +96,7 @@ export function Hero({ resourceCount, categoryCount, minPrice, loading }: HeroPr
 
           <div className="mx-auto w-full max-w-[540px] animate-fade-up lg:mx-0">
             <TradePreview />
+            <TradeRulesPromo />
           </div>
         </div>
       </div>

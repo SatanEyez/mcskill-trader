@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { Calculator, CheckCircle2, Pause, Play, Plus, Scale } from 'lucide-react';
+import {
+  Calculator,
+  CheckCircle2,
+  Pause,
+  Play,
+  Plus,
+  Scale,
+  ShieldCheck,
+} from 'lucide-react';
 import { formatPriceDots } from '../../lib/format';
 
 /**
@@ -326,6 +334,29 @@ export function TradePreview() {
                 ))}
               </div>
               <p className="truncate text-[9.5px] text-slate-500">{CAPTIONS[phase]}</p>
+            </div>
+
+            {/* Бейджи проверенных правил — как в настоящем трейде */}
+            <div
+              className={clsx(
+                'mt-2 flex flex-wrap gap-1.5 transition-all duration-500',
+                ready ? 'opacity-100' : 'opacity-0',
+              )}
+              aria-hidden={!ready}
+            >
+              {[
+                { rule: '9.6', text: 'Цены по минималке' },
+                { rule: '9.10', text: `Разница ${GAP_TEXT} · порог 10%` },
+                { rule: '9.11', text: 'Нет запретных обменов' },
+              ].map((badge) => (
+                <span
+                  key={badge.rule}
+                  className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-accent/[0.08] px-1.5 py-0.5 text-[9px] font-medium text-accent"
+                >
+                  <ShieldCheck className="h-2.5 w-2.5" aria-hidden />
+                  п. {badge.rule} · {badge.text}
+                </span>
+              ))}
             </div>
           </div>
         </div>
