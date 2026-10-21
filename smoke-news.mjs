@@ -30,7 +30,10 @@ async function jsonRequest(path, options = {}) {
 const login = await jsonRequest('/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ login: 'admin', password: 'change-me-strong-password' }),
+  body: JSON.stringify({
+    login: process.env.ADMIN_LOGIN ?? 'admin',
+    password: process.env.ADMIN_PASSWORD ?? 'change-me-strong-password',
+  }),
 });
 const token = login.body?.data?.token;
 check('вход владельца', login.status === 200 && Boolean(token));

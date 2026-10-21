@@ -33,7 +33,7 @@ const envSchema = z.object({
   MYSQL_HOST: z.string().default('127.0.0.1'),
   MYSQL_PORT: z.coerce.number().int().positive().default(3306),
   MYSQL_USER: z.string().default('mcskill'),
-  MYSQL_PASSWORD: z.string().default('mcskill'),
+  MYSQL_PASSWORD: z.string().default('change-me'),
   MYSQL_DATABASE: z.string().default('mcskill_trader'),
   MYSQL_CONNECTION_LIMIT: z.coerce.number().int().positive().default(10),
   /** Облачные MySQL (Aiven, TiDB, PlanetScale, Railway) пускают только по TLS. */

@@ -27,7 +27,7 @@
 
 ```sql
 CREATE DATABASE mcskill_trader CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER 'mcskill'@'localhost' IDENTIFIED BY 'mcskill';
+CREATE USER 'mcskill'@'localhost' IDENTIFIED BY 'change-me';
 GRANT ALL PRIVILEGES ON mcskill_trader.* TO 'mcskill'@'localhost';
 ```
 
@@ -40,7 +40,7 @@ npm run dev                          # API :4000 + Vite :5173
 
 - Сайт: http://localhost:5173
 - API: http://localhost:4000/api/health
-- Админка: http://localhost:5173/admin (при первом запуске создаётся владелец `admin` / `change-me-strong-password` — логин и пароль из `ADMIN_LOGIN` и `ADMIN_PASSWORD`)
+- Админка: http://localhost:5173/admin (при первом запуске создаётся владелец с логином и паролем из `ADMIN_LOGIN` и `ADMIN_PASSWORD`; пароля по умолчанию в репозитории нет — задайте свой в `server/.env`)
 - Токен хранится в `localStorage` под ключом `mcskill.trader.token`.
 
 Миграции применяются автоматически при старте API (`server/migrations/*.sql`,
@@ -88,7 +88,7 @@ npm run dev                          # API :4000 + Vite :5173
 | `NODE_ENV` | `development` / `production` / `test` | `development` |
 | `CLIENT_ORIGIN` | список origin для CORS (через запятую) | `http://localhost:5173` |
 | `ADMIN_LOGIN` | логин владельца при первом запуске | `admin` |
-| `ADMIN_PASSWORD` | пароль владельца (создание при первом запуске) | `change-me-strong-password` |
+| `ADMIN_PASSWORD` | пароль владельца (создание при первом запуске) | задаёте сами, плейсхолдер в `.env.example` |
 | `JWT_SECRET` | секрет подписи JWT (≥16 символов) | dev-значение |
 | `JWT_EXPIRES_IN` | срок жизни токена | `12h` |
 | `UPLOAD_DIR` | каталог загруженных картинок (отдаётся по `/uploads/<файл>`) | `./uploads` |
@@ -167,7 +167,8 @@ TiDB совместим с MySQL не полностью, поэтому миг�
 можно добавить через `ALTER TABLE` и в MySQL, и в TiDB.
 
 **phpMyAdmin** (веб-интерфейс к базе): http://127.0.0.1:8081
-Логин `root` (пароль пустой в локальной сборке) или `mcskill` / `mcskill`; для TiDB — логин/пароль
+Логин `root` с паролем из `MYSQL_ROOT_PASSWORD` или `mcskill` с паролем из `mysql-connection.env`;
+для TiDB — логин/пароль
 из `mysql-connection.env` (phpMyAdmin читает этот же файл и сам включает TLS).
 Запуск: `php -S 127.0.0.1:8081 -t C:\Users\<user>\phpmyadmin-stack\phpmyadmin`.
 

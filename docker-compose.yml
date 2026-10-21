@@ -9,16 +9,18 @@ services:
     restart: unless-stopped
     command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_0900_ai_ci']
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      # Значения по умолчанию — только чтобы контейнер поднялся локально.
+      # Для постоянной работы задайте свои в .env рядом с docker-compose.yml.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
       MYSQL_DATABASE: mcskill_trader
-      MYSQL_USER: mcskill
-      MYSQL_PASSWORD: change-me
+      MYSQL_USER: ${MYSQL_USER:-mcskill}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
     ports:
       - '3306:3306'
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -proot --silent']
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
       interval: 10s
       timeout: 5s
       retries: 10
