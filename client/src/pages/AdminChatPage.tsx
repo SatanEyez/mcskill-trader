@@ -1098,11 +1098,8 @@ export function AdminChatPage() {
         <div className="space-y-3">
           <p className="text-sm leading-relaxed text-slate-300">
             Комната{' '}
-            <span className="font-semibold text-white">
-              {deleteTarget?.avatar_url ? '' : '# '}
-              {deleteTarget?.name}
-            </span>{' '}
-            и вся её переписка будут удалены безвозвратно.
+            <span className="font-semibold text-white">«{deleteTarget?.name}»</span> и вся её
+            переписка будут удалены безвозвратно.
           </p>
           <p className="text-[11px] leading-relaxed text-slate-500">
             Сообщения, фото и отметки прочтения исчезнут у всех администраторов. Восстановить их
