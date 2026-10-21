@@ -151,36 +151,84 @@ function words(value: string): string[] {
   return value.toLowerCase().split(/[-\s]+/).filter((w) => w.length > 0);
 }
 
+/** Длина общего начала двух строк. */
+function commonPrefix(a: string, b: string): number {
+  const limit = Math.min(a.length, b.length);
+  let index = 0;
+  while (index < limit && a[index] === b[index]) index += 1;
+  return index;
+}
+
 /**
- * Fuzzy-поиск: слова запроса могут идти в любом порядке, с ошибками
- * в окончаниях. Подходит для поиска предметов по частям названия.
+ * Насколько слово запроса совпадает со словом названия. 0 — не совпало.
+ *
+ * Сравнение идёт по началу слов, а не по вхождению подстроки: раньше
+ * «компостер» находил «Банку с жёлтым сердцем» — слово «с» считалось
+ * вхождением в запрос, а «стена» совпадала по корню «сте».
+ */
+function wordScore(queryWord: string, targetWord: string): number {
+  if (queryWord === targetWord) return 3;
+
+  // «алмаз» → «Алмазный блок», «метаматерия» → «Мета-материя».
+  // Слова короче трёх букв («с», «к», «не») совпадать по началу не должны:
+  // иначе «компостер» цепляет «Приправу к салату».
+  if (targetWord.length >= 3 && targetWord.startsWith(queryWord)) return 2;
+  if (targetWord.length >= 3 && queryWord.length >= 3 && queryWord.startsWith(targetWord)) return 2;
+
+  // Кусок составного слова: «материя» → «метаматерия»
+  if (queryWord.length >= 4 && targetWord.includes(queryWord)) return 2;
+
+  // Русские окончания: «кровавое» ↔ «кровавой», «тёмное» ↔ «тёмной»
+  const prefix = commonPrefix(queryWord, targetWord);
+  const shortest = Math.min(queryWord.length, targetWord.length);
+  if (prefix >= 4 && prefix >= shortest - 2) return 1;
+
+  return 0;
+}
+
+/**
+ * Релевантность названия запросу. 0 — не подходит.
+ *
+ * Чем больше число, тем выше предмет в списке: точное совпадение названия
+ * всегда первое, дальше — названия, начинающиеся с запроса, потом слова
+ * в любом порядке и совпадения по корню.
  *
  * Примеры:
- *   "материя мета"        → находит "Мета-материя"
- *   "тёмное кровавое ядро" → находит "Тёмное ядро кровавой луны"
- *   "ядро тёмное"          → находит "Тёмное ядро кровавой луны"
+ *   «компостер»            → «Компостер» первым, мусорных совпадений нет
+ *   «материя мета»         → «Мета-материя»
+ *   «тёмное кровавое ядро» → «Тёмное ядро кровавой луны»
+ *   «ядро тёмное»          → «Тёмное ядро кровавой луны»
  */
-export function fuzzyMatch(query: string, target: string): boolean {
-  const qWords = words(query);
-  const tWords = words(target);
+export function searchScore(query: string, target: string): number {
+  const queryWords = words(query);
+  if (queryWords.length === 0) return 0;
+  if (target.length === 0) return 0;
 
-  if (qWords.length === 0) return true;
-  if (tWords.length === 0) return false;
+  const targetWords = words(target);
+  if (targetWords.length === 0) return 0;
 
-  return qWords.every((qw) => {
-    // Точное вхождение слова запроса в слово названия (или наоборот)
-    if (tWords.some((tw) => tw.includes(qw) || qw.includes(tw))) return true;
+  let total = 0;
 
-    // Не нашли — пробуем без последних 2 символов (русское окончание)
-    if (qw.length > 4) {
-      const stem = qw.slice(0, -2);
-      if (tWords.some((tw) => tw.includes(stem))) return true;
+  for (const queryWord of queryWords) {
+    let best = 0;
+
+    for (const targetWord of targetWords) {
+      const score = wordScore(queryWord, targetWord);
+      if (score > best) best = score;
+      if (best === 3) break;
     }
 
-    // И наоборот: короткое слово названия без окончания
-    return tWords.some((tw) => {
-      if (tw.length > 4 && qw.includes(tw.slice(0, -2))) return true;
-      return false;
-    });
-  });
+    // Все слова запроса обязаны найтись в названии.
+    if (best === 0) return 0;
+    total += best;
+  }
+
+  const normalizedQuery = normalizeSearch(query);
+  const normalizedTarget = normalizeSearch(target);
+
+  if (normalizedTarget === normalizedQuery) total += 100;
+  else if (normalizedTarget.startsWith(normalizedQuery)) total += 40;
+  else if (normalizedTarget.includes(normalizedQuery)) total += 15;
+
+  return total;
 }

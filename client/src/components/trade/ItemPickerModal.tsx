@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { UNCATEGORIZED_LABEL } from '../../lib/constants';
 import { readableNameColor } from '../../lib/color';
-import { formatPrice, fuzzyMatch } from '../../lib/format';
+import { formatPrice, searchScore } from '../../lib/format';
 import { MAX_TRADE_LINES } from '../../lib/trade';
 import { Modal } from '../ui/Modal';
 import { ItemImage } from '../ui/ItemImage';
@@ -52,14 +52,28 @@ export function ItemPickerModal({
   }, [resources]);
 
   const filtered = useMemo(() => {
-    return resources.filter((resource) => {
-      const matchesSearch = !query.trim() || fuzzyMatch(query, resource.name);
-      const matchesCategory =
-        categoryId === 'all' ||
-        (categoryId === 'none' ? resource.category_id === null : resource.category_id === categoryId);
+    const trimmed = query.trim();
 
-      return matchesSearch && matchesCategory;
-    });
+    return resources
+      .filter((resource) => {
+        return (
+          categoryId === 'all' ||
+          (categoryId === 'none'
+            ? resource.category_id === null
+            : resource.category_id === categoryId)
+        );
+      })
+      .map((resource) => ({ resource, score: trimmed ? searchScore(trimmed, resource.name) : 0 }))
+      .filter((entry) => !trimmed || entry.score > 0)
+      // Релевантность важнее алфавита: «компостер» должен быть первым,
+      // а не 49-м после случайных совпадений по корню.
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.resource.name.length - b.resource.name.length ||
+          a.resource.name.localeCompare(b.resource.name, 'ru'),
+      )
+      .map((entry) => entry.resource);
   }, [resources, query, categoryId]);
 
   // 9 000+ <li> в модалке подвешивают браузер. Показываем первые 80,
