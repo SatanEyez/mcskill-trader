@@ -47,10 +47,12 @@ function MessageBubble({
   message,
   own,
   hidePrefix,
+  onOpenImage,
 }: {
   message: ChatMessage;
   own: boolean;
   hidePrefix: boolean;
+  onOpenImage: (url: string) => void;
 }) {
   const prefix = hidePrefix ? null : message.user_prefix;
 
@@ -84,20 +86,19 @@ function MessageBubble({
         </div>
 
         {message.image_url && (
-          <a
-            href={message.image_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 block overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 transition hover:border-accent/30"
+          <button
+            type="button"
+            onClick={() => onOpenImage(message.image_url as string)}
+            className="group/photo mt-1 block cursor-zoom-in overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 transition hover:border-accent/40"
             title="Открыть фото"
           >
             <img
               src={message.image_url}
               alt="Фото в чате"
               loading="lazy"
-              className="max-h-64 max-w-full object-contain"
+              className="max-h-72 max-w-full object-contain transition duration-300 group-hover/photo:scale-[1.03]"
             />
-          </a>
+          </button>
         )}
 
         {message.message && (
@@ -151,6 +152,7 @@ export function AdminChatPage() {
   const [attachPreview, setAttachPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const clearAttachment = () => {
     if (attachPreview) URL.revokeObjectURL(attachPreview);
@@ -230,6 +232,17 @@ export function AdminChatPage() {
       document.title = previousTitle;
     };
   }, []);
+
+  useEffect(() => {
+    if (!previewImage) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewImage(null);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [previewImage]);
 
   useEffect(() => {
     const sync = () => setSoundEnabled(isChatSoundEnabled());
@@ -574,6 +587,7 @@ export function AdminChatPage() {
                             message={message}
                             own={own}
                             hidePrefix={hidePrefixes}
+                            onOpenImage={setPreviewImage}
                           />
                         </div>
                       );
@@ -659,6 +673,31 @@ export function AdminChatPage() {
           </section>
         </div>
       </main>
+
+      {previewImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Просмотр фото"
+          onClick={() => setPreviewImage(null)}
+          className="animate-fade-in fixed inset-0 z-[60] grid cursor-zoom-out place-items-center bg-black/85 p-4 backdrop-blur-sm"
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+            aria-label="Закрыть фото"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+          <img
+            src={previewImage}
+            alt="Фото из чата"
+            onClick={(event) => event.stopPropagation()}
+            className="animate-photo-in max-h-[86vh] max-w-[92vw] cursor-default rounded-2xl border border-white/10 object-contain shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)]"
+          />
+        </div>
+      )}
 
       <Modal
         open={createOpen}

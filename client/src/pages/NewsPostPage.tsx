@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, Eye } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError, fetchNewsPost } from '../lib/api';
 import { formatDateTimeMsk } from '../lib/format';
+import { looksLikeHtml, sanitizeNewsHtml } from '../lib/news-html';
 import type { NewsPost } from '../types';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
@@ -114,9 +115,17 @@ export function NewsPostPage() {
                 />
               )}
 
-              <div className="mt-5 whitespace-pre-line text-sm leading-relaxed text-slate-300">
-                {post.body}
-              </div>
+              {looksLikeHtml(post.body) ? (
+                <div
+                  className="mt-5 text-sm leading-relaxed text-slate-300 [&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-accent/40 [&_blockquote]:pl-3 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
+                  // Разметку присылает только редактор новостей, перед вставкой она чистится.
+                  dangerouslySetInnerHTML={{ __html: sanitizeNewsHtml(post.body) }}
+                />
+              ) : (
+                <div className="mt-5 whitespace-pre-line text-sm leading-relaxed text-slate-300">
+                  {post.body}
+                </div>
+              )}
             </article>
           )}
         </div>

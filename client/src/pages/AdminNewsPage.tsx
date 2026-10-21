@@ -23,6 +23,9 @@ import { useToast } from '../context/ToastContext';
 import { formatDateTimeMsk, pluralize } from '../lib/format';
 import type { NewsPost } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
+import { NewsEditor } from '../components/admin/NewsEditor';
+import { Checkbox } from '../components/ui/Checkbox';
+import { sanitizeNewsHtml, stripHtml } from '../lib/news-html';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { Modal } from '../components/ui/Modal';
 import { PageLoader, Spinner } from '../components/ui/Spinner';
@@ -141,14 +144,15 @@ export function AdminNewsPage() {
 
   const handleSave = async () => {
     const title = form.title.trim();
-    const body = form.body.trim();
+    const body = sanitizeNewsHtml(form.body).trim();
+    const bodyText = stripHtml(body).replace(/\u00a0/g, ' ').trim();
 
     if (title.length < 3) {
       setFormError('Заголовок слишком короткий');
       return;
     }
 
-    if (body.length < 10) {
+    if (bodyText.length < 10) {
       setFormError('Текст слишком короткий (минимум 10 символов)');
       return;
     }
@@ -392,15 +396,15 @@ export function AdminNewsPage() {
             <label htmlFor="news-body" className="mb-1.5 block text-xs font-medium text-slate-300">
               Текст
             </label>
-            <textarea
+            <NewsEditor
               id="news-body"
               value={form.body}
-              onChange={(event) => setForm({ ...form, body: event.target.value })}
-              rows={10}
-              maxLength={20_000}
-              placeholder="Что изменилось и с какого момента…"
-              className="field resize-y py-2.5"
+              onChange={(html) => setForm({ ...form, body: html })}
             />
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+              Шрифт и цвет применяются к выделенному фрагменту. Разметка сохраняется вместе
+              с новостью и очищается от лишних тегов при публикации.
+            </p>
           </div>
 
           <div>
@@ -441,12 +445,24 @@ export function AdminNewsPage() {
             />
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3">
-            <input
-              type="checkbox"
+          <div
+            role="checkbox"
+            aria-checked={form.is_published}
+            tabIndex={0}
+            onClick={() => setForm({ ...form, is_published: !form.is_published })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setForm({ ...form, is_published: !form.is_published });
+              }
+            }}
+            className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 transition hover:border-white/15"
+          >
+            <Checkbox
               checked={form.is_published}
-              onChange={(event) => setForm({ ...form, is_published: event.target.checked })}
-              className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/5 accent-accent"
+              onChange={() => setForm({ ...form, is_published: !form.is_published })}
+              label="Опубликовать сразу"
+              className="mt-0.5"
             />
             <span className="text-xs leading-relaxed text-slate-300">
               Опубликовать сразу
@@ -454,7 +470,7 @@ export function AdminNewsPage() {
                 Если снять — новость сохранится черновиком и не появится на сайте.
               </span>
             </span>
-          </label>
+          </div>
 
           {formError && (
             <p role="alert" className="rounded-lg border border-rose-500/25 bg-rose-500/[0.07] px-3 py-2.5 text-xs text-rose-300">

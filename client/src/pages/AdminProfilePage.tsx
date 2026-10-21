@@ -3,6 +3,7 @@ import {
   Camera,
   Crown,
   ImagePlus,
+  KeyRound,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -18,6 +19,7 @@ import { isChatSoundEnabled, setChatSoundEnabled } from '../lib/chat-sound';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
+import { ChangePasswordModal } from '../components/admin/ChangePasswordModal';
 import { Spinner } from '../components/ui/Spinner';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -44,6 +46,7 @@ export function AdminProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [soundEnabled, setSoundEnabledState] = useState(isChatSoundEnabled);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -307,6 +310,27 @@ export function AdminProfilePage() {
               Права: {user.permissions.includes('*') ? 'полный доступ' : user.permissions.join(', ') || 'нет'}
             </div>
           </section>
+
+          <section className="panel p-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <KeyRound className="h-4 w-4 text-accent" aria-hidden />
+              Пароль
+            </h2>
+
+            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+              Смена пароля здесь же, в профиле. После сохранения все остальные сессии
+              завершатся — текущая продлится автоматически.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setPasswordOpen(true)}
+              className="btn btn-secondary mt-4 w-full px-3 py-2 text-xs"
+            >
+              <KeyRound className="h-3.5 w-3.5" aria-hidden />
+              Сменить пароль
+            </button>
+          </section>
         </div>
 
         <section className="panel mt-4 p-5">
@@ -353,6 +377,8 @@ export function AdminProfilePage() {
           </div>
         </section>
       </main>
+
+      <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>
   );
 }

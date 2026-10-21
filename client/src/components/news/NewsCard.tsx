@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import type { NewsPost } from '../../types';
 import { formatDateMsk } from '../../lib/format';
+import { stripHtml } from '../../lib/news-html';
 
-/** Короткий анонс: первая пара предложений без переносов строк. */
+/** Короткий анонс: первая пара предложений без переносов строк и разметки. */
 export function newsExcerpt(body: string, length = 220): string {
-  const flat = body.replace(/\s+/g, ' ').trim();
+  const flat = stripHtml(body).replace(/\s+/g, ' ').trim();
   if (flat.length <= length) return flat;
   return `${flat.slice(0, length).trimEnd()}…`;
 }

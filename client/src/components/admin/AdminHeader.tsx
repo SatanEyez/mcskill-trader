@@ -1,9 +1,8 @@
-import { ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
+import { ChevronRight, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Logo } from '../layout/Logo';
 import { AdminAvatar } from './AdminAvatar';
-import { ChangePasswordButton } from './ChangePasswordModal';
 
 export function AdminHeader() {
   const { user, logout } = useAuth();
@@ -32,33 +31,49 @@ export function AdminHeader() {
           {user && (
             <Link
               to="/admin/profile"
-              className="hidden max-w-[220px] items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 transition hover:border-white/20 hover:bg-white/[0.05] sm:inline-flex"
-              title="Мой профиль"
+              title="Профиль: аватар, префикс и пароль"
+              className="group flex max-w-[16rem] items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.015] py-1.5 pl-1.5 pr-2.5 transition hover:border-accent/35 hover:from-accent/[0.10] hover:to-white/[0.02]"
             >
               <AdminAvatar
                 login={user.login}
                 avatarUrl={user.avatar_url}
                 color={prefixColor}
-                size="sm"
+                size="md"
+                rounded="xl"
                 initials={1}
               />
-              <span className="min-w-0">
-                <span
-                  className="block truncate text-xs font-semibold"
-                  style={{ color: prefixColor }}
-                  title={user.login}
-                >
-                  {user.prefix ? `${user.prefix.name} · ` : ''}
-                  {user.login}
+
+              <span className="hidden min-w-0 sm:block">
+                <span className="flex items-center gap-1.5">
+                  {user.prefix && (
+                    <span
+                      className="shrink-0 rounded-full border px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.08em]"
+                      style={{
+                        color: prefixColor,
+                        borderColor: `${prefixColor}55`,
+                        backgroundColor: `${prefixColor}1f`,
+                      }}
+                    >
+                      {user.prefix.name}
+                    </span>
+                  )}
+                  <span className="truncate text-xs font-semibold text-white">{user.login}</span>
                 </span>
-                <span className="block truncate text-[9px] uppercase tracking-wider text-slate-500">
+                <span className="mt-0.5 flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">
                   {roleLabel}
+                  <span className="text-slate-700" aria-hidden>
+                    ·
+                  </span>
+                  <span className="text-accent/80 normal-case tracking-normal">Профиль</span>
                 </span>
               </span>
+
+              <ChevronRight
+                className="hidden h-3.5 w-3.5 shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-accent sm:block"
+                aria-hidden
+              />
             </Link>
           )}
-
-          <ChangePasswordButton />
 
           <Link to="/" className="btn btn-secondary px-3 py-2 text-xs">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden />

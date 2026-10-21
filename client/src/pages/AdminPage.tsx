@@ -27,6 +27,7 @@ import {
 } from '../lib/api';
 import { readableNameColor } from '../lib/color';
 import { categoryStyle } from '../lib/constants';
+import { Checkbox } from '../components/ui/Checkbox';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminStats } from '../components/admin/AdminStats';
@@ -145,6 +146,8 @@ export function AdminPage() {
 
   const allVisibleSelected =
     resources.length > 0 && resources.every((item) => selectedIds.has(item.id));
+  const someVisibleSelected =
+    !allVisibleSelected && resources.some((item) => selectedIds.has(item.id));
 
   const toggleAllVisible = () => {
     setSelectedIds((current) => {
@@ -428,12 +431,11 @@ export function AdminPage() {
                       <thead>
                         <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.14em] text-slate-500">
                           <th scope="col" className="w-10 px-3 py-3">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={allVisibleSelected}
+                              indeterminate={someVisibleSelected}
                               onChange={toggleAllVisible}
-                              className="h-4 w-4 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
-                              aria-label="Выбрать все предметы на странице"
+                              label="Выбрать все предметы на странице"
                             />
                           </th>
                           <th scope="col" className="px-4 py-3 font-semibold">
@@ -463,12 +465,10 @@ export function AdminPage() {
                             )}
                           >
                             <td className="px-3 py-3">
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={selectedIds.has(resource.id)}
                                 onChange={() => toggleSelected(resource.id)}
-                                className="h-4 w-4 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
-                                aria-label={`Выбрать ${resource.name}`}
+                                label={`Выбрать ${resource.name}`}
                               />
                             </td>
                             <td className="px-4 py-3">
@@ -552,12 +552,11 @@ export function AdminPage() {
                           selectedIds.has(resource.id) && 'bg-rose-500/[0.04]',
                         )}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedIds.has(resource.id)}
                           onChange={() => toggleSelected(resource.id)}
-                          className="mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 bg-white/5 accent-emerald-400"
-                          aria-label={`Выбрать ${resource.name}`}
+                          label={`Выбрать ${resource.name}`}
+                          className="mt-1"
                         />
                         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
                           <ItemImage
