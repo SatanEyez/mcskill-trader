@@ -63,6 +63,19 @@ export const env = parsed.data;
 export const isProduction = env.NODE_ENV === 'production';
 
 if (isProduction) {
+  // На хостинге файла mysql-connection.env нет: настройки приходят только из
+  // переменных окружения. Без этой проверки приложение молча стучится в
+  // локальный MySQL и падает с невнятным ECONNREFUSED 127.0.0.1:3306.
+  const missingMysql = (['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE'] as const).filter(
+    (key) => !process.env[key],
+  );
+
+  if (missingMysql.length > 0) {
+    console.error('❌ В production не заданы переменные окружения MySQL:', missingMysql.join(', '));
+    console.error('   Задайте их в настройках сервиса (Environment) и перезапустите приложение.');
+    process.exit(1);
+  }
+
   if (env.ADMIN_PASSWORD === 'change-me-strong-password') {
     console.warn('⚠️  ADMIN_PASSWORD оставлен по умолчанию. Смените его перед публикацией!');
   }
