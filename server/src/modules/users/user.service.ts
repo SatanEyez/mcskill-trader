@@ -21,6 +21,7 @@ type UserRowWithRelations = AdminUserBaseRow & {
   role_code: string | null;
   role_name: string | null;
   role_permissions: unknown;
+  role_access_level: number | string | null;
   prefix_name: string | null;
   prefix_color: string | null;
   is_online: boolean | number;
@@ -52,6 +53,7 @@ const USER_SELECT = `
          r.code AS role_code,
          r.name AS role_name,
          r.permissions AS role_permissions,
+         r.access_level AS role_access_level,
          p.name AS prefix_name,
          p.color AS prefix_color
     FROM admin_users AS u
@@ -69,6 +71,7 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
     role_id: row.role_id,
     role_code: row.role_code,
     role_name: row.role_name,
+    access_level: Number(row.role_access_level ?? 0),
     permissions: normalizePermissions(row.role_permissions),
     prefix:
       row.prefix_id && row.prefix_name && row.prefix_color

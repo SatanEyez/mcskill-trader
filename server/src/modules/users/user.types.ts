@@ -50,6 +50,8 @@ export interface AdminUserDto {
   role_id: string | null;
   role_code: string | null;
   role_name: string | null;
+  /** Уровень доступа роли: используется служебным чатом для видимости комнат. */
+  access_level: number;
   permissions: string[];
   prefix: AdminPrefixDto | null;
   is_system: boolean;

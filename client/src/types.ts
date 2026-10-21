@@ -66,9 +66,19 @@ export interface ChatRoom {
   name: string;
   created_by_login: string | null;
   created_at: string;
+  /** Минимальный уровень доступа, который видит комнату (0 — все с правом chat.use). */
+  access_level: number;
+  /** С какого уровня доступа в комнате видны префиксы (0 — всем участникам). */
+  prefix_level: number;
   /** Сколько сообщений пользователь ещё не прочитал. */
   unread_count: number;
   last_message: ChatRoomLastMessage | null;
+}
+
+/** Уровень доступа роли для выбора в форме создания комнаты. */
+export interface ChatAccessLevel {
+  level: number;
+  label: string;
 }
 
 export interface ChatMessage {
@@ -117,6 +127,8 @@ export interface AdminUser {
   role_id: string | null;
   role_code: string | null;
   role_name: string | null;
+  /** Уровень доступа роли: чем больше, тем выше должность. */
+  access_level: number;
   permissions: string[];
   prefix: AdminPrefix | null;
   is_system: boolean;

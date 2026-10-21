@@ -1,8 +1,13 @@
-import { Calculator, Scale, ShieldAlert, Trash2 } from 'lucide-react';
+import { Calculator, CheckCircle2, Scale, ShieldAlert, Trash2, TriangleAlert } from 'lucide-react';
 import clsx from 'clsx';
 import type { TradeCalculationResult } from '../../types';
 import { formatPrice, formatPriceDots, formatQuantityLabel } from '../../lib/format';
-import { equalityTolerance, isWithinEqualityTolerance } from '../../lib/trade-rules';
+import {
+  equalityGapPercent,
+  equalityTolerance,
+  formatGapPercent,
+  isWithinEqualityTolerance,
+} from '../../lib/trade-rules';
 import { AutoFitText } from '../ui/AutoFitText';
 
 interface TradeSummaryProps {
@@ -44,8 +49,10 @@ export function TradeSummary({
 }: TradeSummaryProps) {
   const { side_a: sideA, side_b: sideB, delta } = result;
 
-  // П. 9.10: погрешность 10% от суммы сделки — в этих пределах обмен равноценный.
+  // П. 9.10: погрешность 10% от меньшей стороны — в этих пределах обмен верный.
   const withinTolerance = hasContent && delta !== 0 && isWithinEqualityTolerance(result);
+  const gapPercent = hasContent && delta !== 0 ? equalityGapPercent(result) : 0;
+  const gapText = formatGapPercent(gapPercent);
 
   const tone: Tone = !hasContent
     ? 'neutral'
@@ -60,7 +67,7 @@ export function TradeSummary({
     : delta === 0
       ? 'Обмен равноценный'
       : withinTolerance
-        ? 'Разница в пределах погрешности'
+        ? 'Обмен верный'
         : delta > 0
           ? 'Вы доплачиваете'
           : 'Вам доплачивают';
@@ -70,10 +77,10 @@ export function TradeSummary({
     : delta === 0
       ? 'Стороны совпали по стоимости: доплата не нужна.'
       : withinTolerance
-        ? `Разница не больше 10% от суммы сделки (${formatPrice(equalityTolerance(result))} монет) — доплата не требуется.`
+        ? `Разница ${gapText} — в пределах 10% от меньшей стороны (${formatPrice(equalityTolerance(result))} монет), доплата не требуется.`
         : delta > 0
-          ? 'Принимающая сторона дороже — разницу стоит доплатить.'
-          : 'Отдающая сторона дороже — доплата положена вам.';
+          ? `Разница ${gapText} — больше допустимых 10%. Принимающая сторона дороже, разницу стоит доплатить.`
+          : `Разница ${gapText} — больше допустимых 10%. Отдающая сторона дороже, доплата положена вам.`;
 
   const shareA = sideA.total + sideB.total > 0 ? sideA.total / (sideA.total + sideB.total) : 0.5;
 
@@ -163,6 +170,25 @@ export function TradeSummary({
               монет
             </span>
           </AutoFitText>
+        )}
+
+        {hasContent && delta !== 0 && (
+          <p
+            className={clsx(
+              'mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+              withinTolerance
+                ? 'border-accent/40 bg-accent/[0.12] text-accent'
+                : 'border-rose-400/40 bg-rose-400/[0.1] text-rose-200',
+            )}
+            title={`Допустимая разница — до ${formatPrice(equalityTolerance(result))} монет`}
+          >
+            {withinTolerance ? (
+              <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
+            ) : (
+              <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
+            )}
+            Разница {gapText} · порог 10%
+          </p>
         )}
 
         <p className="mt-2 text-[10px] leading-relaxed opacity-90">{hint}</p>

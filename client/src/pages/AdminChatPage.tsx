@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ImagePlus,
   Loader2,
+  Lock,
   MessageSquarePlus,
   MessagesSquare,
   Send,
@@ -16,8 +17,8 @@ import { useChat } from '../hooks/useChat';
 import { useAuth } from '../context/AuthContext';
 import { formatDateMsk, formatDateTimeMsk, formatTimeMsk } from '../lib/format';
 import { isChatSoundEnabled, CHAT_SOUND_CHANGED_EVENT } from '../lib/chat-sound';
-import { ApiError, uploadImage } from '../lib/api';
-import type { ChatMessage, ChatRoom } from '../types';
+import { ApiError, fetchChatAccessLevels, uploadImage } from '../lib/api';
+import type { ChatAccessLevel, ChatMessage, ChatRoom } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
@@ -42,8 +43,16 @@ function roomTime(room: ChatRoom): string {
   return formatTimeMsk(stamp);
 }
 
-function MessageBubble({ message, own }: { message: ChatMessage; own: boolean }) {
-  const prefix = message.user_prefix;
+function MessageBubble({
+  message,
+  own,
+  hidePrefix,
+}: {
+  message: ChatMessage;
+  own: boolean;
+  hidePrefix: boolean;
+}) {
+  const prefix = hidePrefix ? null : message.user_prefix;
 
   return (
     <div className={clsx('flex w-full gap-2.5', own ? 'flex-row-reverse' : 'flex-row')}>
@@ -109,7 +118,9 @@ function MessageBubble({ message, own }: { message: ChatMessage; own: boolean })
 }
 
 export function AdminChatPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const canCreate = can('chat.create');
+  const myLevel = user?.access_level ?? 0;
   const {
     rooms,
     activeRoomId,
@@ -130,6 +141,9 @@ export function AdminChatPage() {
   const [draft, setDraft] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [roomName, setRoomName] = useState('');
+  const [roomAccess, setRoomAccess] = useState(0);
+  const [roomPrefixLevel, setRoomPrefixLevel] = useState(0);
+  const [accessLevels, setAccessLevels] = useState<ChatAccessLevel[]>([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(isChatSoundEnabled);
@@ -181,6 +195,33 @@ export function AdminChatPage() {
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null;
   const totalUnread = rooms.reduce((sum, room) => sum + room.unread_count, 0);
+  // Префиксы в комнате скрыты, если у зрителя доступ ниже порога комнаты.
+  const hidePrefixes = activeRoom !== null && myLevel < activeRoom.prefix_level;
+
+  // Справочник уровней доступа: подписи в списке комнат и в форме создания.
+  useEffect(() => {
+    let active = true;
+
+    fetchChatAccessLevels()
+      .then((data) => {
+        if (active) setAccessLevels(data.levels);
+      })
+      .catch(() => {
+        // Без справочника покажем «Уровень N» — не критично для работы чата.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const levelLabel = (level: number): string => {
+    if (level === 0) return 'Все с доступом к чату';
+    return accessLevels.find((entry) => entry.level === level)?.label ?? `Уровень ${level}`;
+  };
+
+  /** Уровни, которые пользователь вправе выставить: не выше собственного. */
+  const availableLevels = accessLevels.filter((entry) => entry.level <= myLevel);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -259,7 +300,10 @@ export function AdminChatPage() {
     setCreating(true);
     setCreateError(null);
 
-    const room = await createRoom(roomName.trim());
+    const room = await createRoom(roomName.trim(), {
+      accessLevel: roomAccess,
+      prefixLevel: roomPrefixLevel,
+    });
     setCreating(false);
 
     if (!room) {
@@ -269,6 +313,8 @@ export function AdminChatPage() {
 
     setCreateOpen(false);
     setRoomName('');
+    setRoomAccess(0);
+    setRoomPrefixLevel(0);
     await selectRoom(room.id);
   };
 
@@ -353,6 +399,11 @@ export function AdminChatPage() {
                       <button
                         type="button"
                         onClick={() => openRoom(room.id)}
+                        title={
+                          room.access_level > 0
+                            ? `Доступ: ${levelLabel(room.access_level)}`
+                            : 'Доступ: все с правом на чат'
+                        }
                         className={clsx(
                           'w-full rounded-xl px-3 py-2.5 text-left transition',
                           room.id === activeRoomId
@@ -369,6 +420,12 @@ export function AdminChatPage() {
                           >
                             <span className="text-slate-500">#</span>
                             <span className="truncate">{room.name}</span>
+                            {room.access_level > 0 && (
+                              <Lock
+                                className="h-3 w-3 shrink-0 text-amber-300/70"
+                                aria-label="Ограниченный доступ"
+                              />
+                            )}
                           </span>
 
                           <span className="flex shrink-0 items-center gap-1.5">
@@ -391,18 +448,26 @@ export function AdminChatPage() {
             </div>
 
             <div className="border-t border-white/[0.06] p-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setCreateError(null);
-                  setRoomName('');
-                  setCreateOpen(true);
-                }}
-                className="btn btn-secondary w-full px-3 py-2 text-xs"
-              >
-                <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden />
-                Создать комнату
-              </button>
+              {canCreate ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateError(null);
+                    setRoomName('');
+                    setRoomAccess(0);
+                    setRoomPrefixLevel(0);
+                    setCreateOpen(true);
+                  }}
+                  className="btn btn-secondary w-full px-3 py-2 text-xs"
+                >
+                  <MessageSquarePlus className="h-3.5 w-3.5" aria-hidden />
+                  Создать комнату
+                </button>
+              ) : (
+                <p className="px-2 py-1.5 text-[10px] leading-relaxed text-slate-600">
+                  Создание комнат доступно не всем — право выдаёт владелец в разделе «Доступ».
+                </p>
+              )}
             </div>
           </aside>
 
@@ -447,10 +512,21 @@ export function AdminChatPage() {
                           ? `создал ${activeRoom.created_by_login}`
                           : 'общий канал'}{' '}
                         · {formatDateTimeMsk(activeRoom.created_at)}
+                        {activeRoom.access_level > 0
+                          ? ` · доступ: ${levelLabel(activeRoom.access_level)}`
+                          : ''}
                       </p>
                     </div>
                   </div>
                 </div>
+
+                {hidePrefixes && (
+                  <p className="flex items-center gap-1.5 border-b border-white/[0.06] bg-amber-400/[0.06] px-4 py-1.5 text-[10px] text-amber-200/80">
+                    <Lock className="h-3 w-3 shrink-0" aria-hidden />
+                    Префиксы скрыты: в этой комнате их видят только с доступа «
+                    {levelLabel(activeRoom.prefix_level)}»
+                  </p>
+                )}
 
                 <div
                   ref={listRef}
@@ -494,7 +570,11 @@ export function AdminChatPage() {
                               {day}
                             </p>
                           )}
-                          <MessageBubble message={message} own={own} />
+                          <MessageBubble
+                            message={message}
+                            own={own}
+                            hidePrefix={hidePrefixes}
+                          />
                         </div>
                       );
                     })
@@ -584,7 +664,11 @@ export function AdminChatPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="Новая комната"
-        description="Канал увидят все администраторы с доступом к чату."
+        description={
+          roomAccess > 0
+            ? `Канал увидят только с доступа «${levelLabel(roomAccess)}» и выше.`
+            : 'Канал увидят все администраторы с доступом к чату.'
+        }
         size="sm"
         footer={
           <>
@@ -624,6 +708,52 @@ export function AdminChatPage() {
               }}
             />
           </label>
+
+          <label className="block">
+            <span className="field-label">Кто видит комнату</span>
+            <select
+              value={roomAccess}
+              onChange={(event) => {
+                setRoomAccess(Number(event.target.value));
+                setCreateError(null);
+              }}
+              className="field"
+            >
+              {availableLevels.map((entry) => (
+                <option key={entry.level} value={entry.level}>
+                  {entry.level === 0 ? 'Все с доступом к чату' : `${entry.label} и выше`}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-500">
+              Комнату не увидят те, чей доступ ниже выбранного.
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="field-label">Кому видны префиксы</span>
+            <select
+              value={roomPrefixLevel}
+              onChange={(event) => {
+                setRoomPrefixLevel(Number(event.target.value));
+                setCreateError(null);
+              }}
+              className="field"
+            >
+              <option value={0}>Всем участникам комнаты</option>
+              {availableLevels
+                .filter((entry) => entry.level > 0)
+                .map((entry) => (
+                  <option key={entry.level} value={entry.level}>
+                    {entry.label} и выше
+                  </option>
+                ))}
+            </select>
+            <span className="mt-1 block text-[10px] leading-relaxed text-slate-500">
+              Должности (префиксы) авторов увидят только с выбранного доступа.
+            </span>
+          </label>
+
           {createError && <p className="text-[11px] text-rose-300">{createError}</p>}
         </div>
       </Modal>

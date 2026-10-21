@@ -62,6 +62,13 @@ export function useChat() {
 
   const activeRoomIdRef = useRef<string | null>(null);
   const userId = user?.id ?? null;
+  const myLevel = user?.access_level ?? 0;
+  // Список комнат для обработчиков сокета: там нужны актуальные данные без ре-рендера.
+  const roomsRef = useRef<ChatRoom[]>([]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
 
   const setActiveRoom = useCallback((roomId: string | null) => {
     activeRoomIdRef.current = roomId;
@@ -188,19 +195,27 @@ export function useChat() {
     [sending],
   );
 
-  const createRoom = useCallback(async (name: string): Promise<ChatRoom | null> => {
-    try {
-      const room = await createChatRoom(name);
-      setRooms((current) => sortRooms([room, ...current.filter((item) => item.id !== room.id)]));
-      notifyChatUpdated();
-      return room;
-    } catch (createError) {
-      setError(
-        createError instanceof ApiError ? createError.message : 'Не удалось создать комнату',
-      );
-      return null;
-    }
-  }, []);
+  const createRoom = useCallback(
+    async (
+      name: string,
+      options: { accessLevel?: number; prefixLevel?: number } = {},
+    ): Promise<ChatRoom | null> => {
+      try {
+        const room = await createChatRoom(name, options);
+        setRooms((current) =>
+          sortRooms([room, ...current.filter((item) => item.id !== room.id)]),
+        );
+        notifyChatUpdated();
+        return room;
+      } catch (createError) {
+        setError(
+          createError instanceof ApiError ? createError.message : 'Не удалось создать комнату',
+        );
+        return null;
+      }
+    },
+    [],
+  );
 
   // Реалтайм: Socket.io присылает новые сообщения и комнаты.
   useEffect(() => {
@@ -215,6 +230,10 @@ export function useChat() {
       const isOwn = userId !== null && message.user_id === userId;
       const isActiveRoom = roomId === message.room_id;
       const visible = !document.hidden;
+      // Комнаты, которых нет в списке (недоступные по уровню доступа), игнорируем.
+      const knownRoom = roomsRef.current.some((room) => room.id === message.room_id);
+
+      if (!knownRoom) return;
 
       if (isActiveRoom) {
         setMessages((current) =>
@@ -254,6 +273,8 @@ export function useChat() {
     const onRoom = (payload: SocketRoomPayload) => {
       const room = payload?.room;
       if (!room) return;
+      // Новая комната приходит всем: показываем только те, что доступны по уровню.
+      if (room.access_level > myLevel) return;
 
       setRooms((current) =>
         sortRooms([room, ...current.filter((item) => item.id !== room.id)]),
@@ -274,7 +295,7 @@ export function useChat() {
       socket.off('chat:room', onRoom);
       socket.off('connect', onReconnect);
     };
-  }, [loadRooms, markRead, userId]);
+  }, [loadRooms, markRead, userId, myLevel]);
 
   // Вернулись на вкладку — дочитываем активную комнату.
   useEffect(() => {

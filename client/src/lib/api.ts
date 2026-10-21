@@ -12,6 +12,7 @@ import type {
   AuditLogMeta,
   AuditPeriod,
   Category,
+  ChatAccessLevel,
   ChatMessage,
   ChatRoom,
   ExcludedResource,
@@ -850,13 +851,32 @@ export async function fetchChatRooms(): Promise<ChatRoom[]> {
   return response.data;
 }
 
-export async function createChatRoom(name: string): Promise<ChatRoom> {
+export async function createChatRoom(
+  name: string,
+  options: { accessLevel?: number; prefixLevel?: number } = {},
+): Promise<ChatRoom> {
   const response = await request<{ data: ChatRoom }>('/chat/rooms', {
     method: 'POST',
-    body: { name },
+    body: {
+      name,
+      access_level: options.accessLevel ?? 0,
+      prefix_level: options.prefixLevel ?? 0,
+    },
     auth: true,
   });
   return response.data;
+}
+
+/** Уровни доступа для формы создания комнаты + собственный уровень пользователя. */
+export async function fetchChatAccessLevels(): Promise<{
+  levels: ChatAccessLevel[];
+  myLevel: number;
+}> {
+  const response = await request<{ data: ChatAccessLevel[]; meta: { my_level: number } }>(
+    '/chat/access-levels',
+    { auth: true },
+  );
+  return { levels: response.data, myLevel: response.meta.my_level };
 }
 
 export async function fetchChatMessages(

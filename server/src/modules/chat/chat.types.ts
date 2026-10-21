@@ -3,6 +3,8 @@ export interface ChatRoomRow {
   name: string;
   created_by_login: string | null;
   created_at: Date | string;
+  access_level: number | string;
+  prefix_level: number | string;
   unread_count: number | string;
   last_message: string | null;
   last_message_login: string | null;
@@ -14,6 +16,10 @@ export interface ChatRoomDto {
   name: string;
   created_by_login: string | null;
   created_at: string;
+  /** Минимальный уровень доступа, который видит комнату (0 — все с правом chat.use). */
+  access_level: number;
+  /** С какого уровня доступа в комнате видны префиксы авторов (0 — всем участникам). */
+  prefix_level: number;
   /** Сколько сообщений пользователь ещё не прочитал (свои не считаются). */
   unread_count: number;
   last_message: {
@@ -21,6 +27,12 @@ export interface ChatRoomDto {
     message: string;
     created_at: string;
   } | null;
+}
+
+/** Уровень доступа роли и подпись для выбора в интерфейсе. */
+export interface ChatAccessLevelDto {
+  level: number;
+  label: string;
 }
 
 export interface ChatMessageRow {
@@ -53,4 +65,11 @@ export interface ChatMessageDto {
 export interface ListMessagesQuery {
   before?: string;
   limit: number;
+}
+
+/** Состояние комнаты и уровень доступа зрителя — для проверок видимости. */
+export interface RoomAccess {
+  accessLevel: number;
+  prefixLevel: number;
+  viewerLevel: number;
 }

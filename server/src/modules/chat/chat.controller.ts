@@ -20,8 +20,18 @@ export const listRooms: RequestHandler = asyncHandler(async (req, res) => {
 
 export const createRoom: RequestHandler = asyncHandler(async (req, res) => {
   const body = req.validatedBody as CreateRoomBody;
-  const data = await chatService.createRoom(body.name, req.auth!);
+  const data = await chatService.createRoom(
+    body.name,
+    body.access_level ?? 0,
+    body.prefix_level ?? 0,
+    req.auth!,
+  );
   res.status(201).json({ data });
+});
+
+export const listAccessLevels: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await chatService.listAccessLevels(req.auth!.sub);
+  res.json({ data: data.levels, meta: { my_level: data.myLevel } });
 });
 
 export const listMessages: RequestHandler = asyncHandler(async (req, res) => {

@@ -49,21 +49,43 @@ export function maxAllowedPrice(minPrice: number): number {
 }
 
 /**
- * П. 9.10: равноценность считается с погрешностью 10% от суммы сделки
- * (стоимость обеих сторон). Разница в этих пределах не считается
- * неравноценным обменом.
+ * П. 9.10: равноценность считается с погрешностью 10% от стоимости меньшей
+ * стороны сделки. Разница в этих пределах не считается неравноценным обменом.
  */
 export const EQUALITY_TOLERANCE_SHARE = 0.1;
 
-/** Допустимая разница сторон в монетах: 10% от суммы сделки. */
-export function equalityTolerance(result: TradeCalculationResult): number {
-  const total = result.side_a.total + result.side_b.total;
+/** База для процента: стоимость меньшей (более дешёвой) стороны сделки. */
+export function equalityToleranceBase(result: TradeCalculationResult): number {
+  const a = result.side_a.total;
+  const b = result.side_b.total;
+  const min = Math.min(a, b);
 
-  return Math.round(total * EQUALITY_TOLERANCE_SHARE * 100) / 100;
+  return min > 0 ? min : Math.max(a, b);
+}
+
+/** Допустимая разница сторон в монетах: 10% от меньшей стороны. */
+export function equalityTolerance(result: TradeCalculationResult): number {
+  return Math.round(equalityToleranceBase(result) * EQUALITY_TOLERANCE_SHARE * 100) / 100;
+}
+
+/** Текущая разница сторон в процентах от меньшей стороны сделки. */
+export function equalityGapPercent(result: TradeCalculationResult): number {
+  const base = equalityToleranceBase(result);
+
+  if (base <= 0) return 0;
+
+  return (Math.abs(result.delta) / base) * 100;
 }
 
 export function isWithinEqualityTolerance(result: TradeCalculationResult): boolean {
   return Math.abs(result.delta) <= equalityTolerance(result);
+}
+
+/** Процент разницы для интерфейса: «6,4%» или «124%». */
+export function formatGapPercent(value: number): string {
+  const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+
+  return `${String(rounded).replace('.', ',')}%`;
 }
 
 /** Предметы, публичная раздача которых запрещена п. 9.7. */
@@ -266,10 +288,11 @@ export function checkTradeRules(
       severity: 'warning',
       title: 'Стороны не равноценны',
       message:
-        `Разница с учётом монет — ${formatPrice(Math.abs(result.delta))} монет. ` +
+        `Разница с учётом монет — ${formatPrice(Math.abs(result.delta))} монет, ` +
+        `это ${formatGapPercent(equalityGapPercent(result))} от меньшей стороны. ` +
         'Доплата должна пройти в игре и подтверждаться логами сервера, иначе сделку могут ' +
         'квалифицировать как неравноценный обмен (п. 9.10). Допустимая погрешность — 10% ' +
-        `от суммы сделки (${formatPrice(equalityTolerance(result))} монет).`,
+        `от меньшей стороны (${formatPrice(equalityTolerance(result))} монет).`,
       items: [],
     });
   }
