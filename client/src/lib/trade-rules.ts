@@ -49,26 +49,23 @@ export function maxAllowedPrice(minPrice: number): number {
 }
 
 /**
- * П. 9.10: равноценность считается с погрешностью 10% от стоимости меньшей
- * стороны сделки. Разница в этих пределах не считается неравноценным обменом.
+ * П. 9.10: равноценность считается с погрешностью 10% от итоговой суммы сделки
+ * (стоимость обеих сторон). Разница в этих пределах не считается неравноценным
+ * обменом.
  */
 export const EQUALITY_TOLERANCE_SHARE = 0.1;
 
-/** База для процента: стоимость меньшей (более дешёвой) стороны сделки. */
+/** База для процента: итоговая сумма сделки — стоимость обеих сторон. */
 export function equalityToleranceBase(result: TradeCalculationResult): number {
-  const a = result.side_a.total;
-  const b = result.side_b.total;
-  const min = Math.min(a, b);
-
-  return min > 0 ? min : Math.max(a, b);
+  return result.side_a.total + result.side_b.total;
 }
 
-/** Допустимая разница сторон в монетах: 10% от меньшей стороны. */
+/** Допустимая разница сторон в монетах: 10% от итоговой суммы. */
 export function equalityTolerance(result: TradeCalculationResult): number {
   return Math.round(equalityToleranceBase(result) * EQUALITY_TOLERANCE_SHARE * 100) / 100;
 }
 
-/** Текущая разница сторон в процентах от меньшей стороны сделки. */
+/** Текущая разница сторон в процентах от итоговой суммы сделки. */
 export function equalityGapPercent(result: TradeCalculationResult): number {
   const base = equalityToleranceBase(result);
 
@@ -289,10 +286,10 @@ export function checkTradeRules(
       title: 'Стороны не равноценны',
       message:
         `Разница с учётом монет — ${formatPrice(Math.abs(result.delta))} монет, ` +
-        `это ${formatGapPercent(equalityGapPercent(result))} от меньшей стороны. ` +
+        `это ${formatGapPercent(equalityGapPercent(result))} от итоговой суммы сделки. ` +
         'Доплата должна пройти в игре и подтверждаться логами сервера, иначе сделку могут ' +
         'квалифицировать как неравноценный обмен (п. 9.10). Допустимая погрешность — 10% ' +
-        `от меньшей стороны (${formatPrice(equalityTolerance(result))} монет).`,
+        `от итоговой суммы (${formatPrice(equalityTolerance(result))} монет).`,
       items: [],
     });
   }

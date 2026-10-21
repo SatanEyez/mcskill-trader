@@ -49,7 +49,7 @@ export function TradeSummary({
 }: TradeSummaryProps) {
   const { side_a: sideA, side_b: sideB, delta } = result;
 
-  // П. 9.10: погрешность 10% от меньшей стороны — в этих пределах обмен верный.
+  // П. 9.10: погрешность 10% от итоговой суммы — в этих пределах обмен верный.
   const withinTolerance = hasContent && delta !== 0 && isWithinEqualityTolerance(result);
   const gapPercent = hasContent && delta !== 0 ? equalityGapPercent(result) : 0;
   const gapText = formatGapPercent(gapPercent);
@@ -77,7 +77,7 @@ export function TradeSummary({
     : delta === 0
       ? 'Стороны совпали по стоимости: доплата не нужна.'
       : withinTolerance
-        ? `Разница ${gapText} — в пределах 10% от меньшей стороны (${formatPrice(equalityTolerance(result))} монет), доплата не требуется.`
+        ? `Разница ${gapText} — в пределах 10% от итоговой суммы (${formatPrice(equalityTolerance(result))} монет), доплата не требуется.`
         : delta > 0
           ? `Разница ${gapText} — больше допустимых 10%. Принимающая сторона дороже, разницу стоит доплатить.`
           : `Разница ${gapText} — больше допустимых 10%. Отдающая сторона дороже, доплата положена вам.`;
