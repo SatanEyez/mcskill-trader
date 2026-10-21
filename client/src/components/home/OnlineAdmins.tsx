@@ -2,10 +2,7 @@ import { ShieldCheck, UsersRound } from 'lucide-react';
 import { useOnlineAdmins } from '../../hooks/useOnlineAdmins';
 import { pluralize } from '../../lib/format';
 import { Spinner } from '../ui/Spinner';
-
-function initials(login: string): string {
-  return login.slice(0, 2).toUpperCase();
-}
+import { AdminAvatar } from '../admin/AdminAvatar';
 
 /**
  * Правая колонка главной: кто из администраторов сейчас в сети.
@@ -64,16 +61,12 @@ export function OnlineAdmins() {
                   key={admin.id}
                   className="flex items-center gap-3 rounded-xl border border-slate-700/40 bg-slate-900/40 px-3 py-2.5"
                 >
-                  <span
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-xs font-semibold"
-                    style={{
-                      color,
-                      borderColor: `${color}55`,
-                      backgroundColor: `${color}14`,
-                    }}
-                  >
-                    {initials(admin.login)}
-                  </span>
+                  <AdminAvatar
+                    login={admin.login}
+                    avatarUrl={admin.avatar_url}
+                    color={color}
+                    size="md"
+                  />
                   <span className="min-w-0 flex-1">
                     <span
                       className="block truncate text-sm font-semibold"

@@ -70,6 +70,11 @@ export interface AdminUser {
   reviewed_at: string | null;
   reviewed_by: string | null;
   reviewed_by_login: string | null;
+  /** Кто последним менял роль и префикс (из журнала действий). */
+  role_assigned_by_login: string | null;
+  role_assigned_at: string | null;
+  prefix_assigned_by_login: string | null;
+  prefix_assigned_at: string | null;
   last_login_at: string | null;
   last_seen_at: string | null;
 }
@@ -103,6 +108,7 @@ export interface AuditLogEntry {
   created_at: string;
   user_id: string | null;
   user_login: string;
+  user_avatar_url: string | null;
   action: string;
   entity_type: string | null;
   entity_id: string | null;
@@ -202,6 +208,7 @@ export interface OnlineAdmin {
   login: string;
   role_name: string | null;
   prefix: AdminPrefix | null;
+  avatar_url: string | null;
   last_seen_at: string;
 }
 
@@ -222,6 +229,7 @@ export interface SupportTicket {
   admin_reply: string | null;
   replied_by: string | null;
   replied_by_login: string | null;
+  replied_by_avatar_url: string | null;
   replied_at: string | null;
   created_at: string;
   updated_at: string;
@@ -250,6 +258,7 @@ export interface ReportInput {
 export interface ImportJob {
   id: string;
   actor_login: string;
+  actor_avatar_url: string | null;
   status: 'running' | 'done' | 'failed';
   source_name: string | null;
   total_items: number;

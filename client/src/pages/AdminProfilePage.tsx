@@ -6,11 +6,24 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatDateTimeMsk } from '../lib/format';
 import { AdminHeader } from '../components/admin/AdminHeader';
+import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { Spinner } from '../components/ui/Spinner';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+/** Подпись «кто выдал роль/префикс» — из журнала действий. */
+function AssignedBy({ login, at }: { login: string | null; at: string | null }) {
+  if (!login) return null;
+
+  return (
+    <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+      выдал {login}
+      {at ? ` · ${formatDateTimeMsk(at)}` : ''}
+    </span>
+  );
+}
 
 export function AdminProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -126,24 +139,14 @@ export function AdminProfilePage() {
             </h2>
 
             <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-              <span
-                className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl border text-3xl font-semibold uppercase"
-                style={{
-                  color: prefixColor,
-                  borderColor: `${prefixColor}55`,
-                  backgroundColor: `${prefixColor}14`,
-                }}
-              >
-                {shownAvatar ? (
-                  <img
-                    src={shownAvatar}
-                    alt={`Аватар ${user.login}`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  user.login.slice(0, 1)
-                )}
-              </span>
+              <AdminAvatar
+                login={user.login}
+                avatarUrl={shownAvatar}
+                color={prefixColor}
+                size="xl"
+                rounded="2xl"
+                initials={1}
+              />
 
               <div className="min-w-0 flex-1 text-center sm:text-left">
                 <p className="text-sm font-semibold text-white">{user.login}</p>
@@ -217,27 +220,46 @@ export function AdminProfilePage() {
 
               <div className="flex items-start justify-between gap-3">
                 <dt className="text-slate-500">Роль</dt>
-                <dd className="flex items-center gap-1.5 font-medium text-white">
-                  {user.role === 'owner' ? (
-                    <Crown className="h-3.5 w-3.5 text-fuchsia-300" aria-hidden />
-                  ) : (
-                    <ShieldCheck className="h-3.5 w-3.5 text-accent" aria-hidden />
-                  )}
-                  {roleLabel}
+                <dd className="text-right">
+                  <span className="inline-flex items-center gap-1.5 font-medium text-white">
+                    {user.role === 'owner' ? (
+                      <Crown className="h-3.5 w-3.5 text-fuchsia-300" aria-hidden />
+                    ) : (
+                      <ShieldCheck className="h-3.5 w-3.5 text-accent" aria-hidden />
+                    )}
+                    {roleLabel}
+                  </span>
+                  <AssignedBy
+                    login={user.role_assigned_by_login}
+                    at={user.role_assigned_at}
+                  />
                 </dd>
               </div>
 
               <div className="flex items-start justify-between gap-3">
                 <dt className="text-slate-500">Префикс</dt>
-                <dd className="font-medium" style={{ color: prefixColor }}>
-                  {user.prefix?.name ?? 'нет'}
+                <dd className="text-right">
+                  <span className="font-medium" style={{ color: prefixColor }}>
+                    {user.prefix?.name ?? 'нет'}
+                  </span>
+                  <AssignedBy
+                    login={user.prefix_assigned_by_login}
+                    at={user.prefix_assigned_at}
+                  />
                 </dd>
               </div>
 
               <div className="flex items-start justify-between gap-3">
                 <dt className="text-slate-500">Статус</dt>
                 <dd className="font-medium text-white">
-                  {user.status === 'approved' ? 'Одобрен' : user.status}
+                  {user.status === 'approved'
+                    ? `Одобрен (${user.reviewed_by_login ?? 'система'})`
+                    : user.status}
+                  {user.status === 'approved' && user.reviewed_at && (
+                    <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                      {formatDateTimeMsk(user.reviewed_at)}
+                    </span>
+                  )}
                 </dd>
               </div>
 

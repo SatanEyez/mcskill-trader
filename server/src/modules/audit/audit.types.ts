@@ -35,6 +35,7 @@ export interface AuditLogRow {
   details: unknown;
   ip: string | null;
   user_agent: string | null;
+  user_avatar_url: string | null;
   total_count?: number | string;
 }
 
@@ -43,6 +44,7 @@ export interface AuditLogDto {
   created_at: string;
   user_id: string | null;
   user_login: string;
+  user_avatar_url: string | null;
   action: string;
   entity_type: string | null;
   entity_id: string | null;

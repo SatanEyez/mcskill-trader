@@ -25,6 +25,7 @@ export interface SupportTicketDto {
   admin_reply: string | null;
   replied_by: string | null;
   replied_by_login: string | null;
+  replied_by_avatar_url: string | null;
   replied_at: string | null;
   created_at: string;
   updated_at: string;
@@ -52,6 +53,7 @@ interface TicketRow {
   admin_reply: string | null;
   replied_by: string | null;
   replied_by_login: string | null;
+  replied_by_avatar_url: string | null;
   replied_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
@@ -73,6 +75,7 @@ function toDto(row: TicketRow): SupportTicketDto {
     admin_reply: row.admin_reply,
     replied_by: row.replied_by,
     replied_by_login: row.replied_by_login,
+    replied_by_avatar_url: row.replied_by_avatar_url || null,
     replied_at: row.replied_at ? toIso(row.replied_at) : null,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
@@ -141,7 +144,9 @@ export async function listTickets(query: ListTicketsQuery): Promise<TicketListRe
   params.push(query.limit, query.offset);
 
   const result = await db.query<TicketRow>(
-    `SELECT *, COUNT(*) OVER() AS total_count
+    `SELECT *,
+            (SELECT u.avatar_url FROM admin_users AS u WHERE u.id = support_tickets.replied_by) AS replied_by_avatar_url,
+            COUNT(*) OVER() AS total_count
        FROM support_tickets
        ${whereSql}
       ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
@@ -180,7 +185,13 @@ export async function getTicketCounts(): Promise<TicketCounts> {
 
 export async function getTicket(id: string): Promise<SupportTicketDto> {
   const db = await getDb();
-  const result = await db.query<TicketRow>('SELECT * FROM support_tickets WHERE id = ?', [id]);
+  const result = await db.query<TicketRow>(
+    `SELECT *,
+            (SELECT u.avatar_url FROM admin_users AS u WHERE u.id = support_tickets.replied_by) AS replied_by_avatar_url
+       FROM support_tickets
+      WHERE id = ?`,
+    [id],
+  );
   const row = result.rows[0];
 
   if (!row) throw new HttpError(404, 'Обращение не найдено');

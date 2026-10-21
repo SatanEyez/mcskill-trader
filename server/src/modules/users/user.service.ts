@@ -74,6 +74,10 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
     reviewed_at: row.reviewed_at ? toIso(row.reviewed_at) : null,
     reviewed_by: row.reviewed_by,
     reviewed_by_login: row.reviewed_by_login ?? null,
+    role_assigned_by_login: null,
+    role_assigned_at: null,
+    prefix_assigned_by_login: null,
+    prefix_assigned_at: null,
     last_login_at: row.last_login_at ? toIso(row.last_login_at) : null,
     last_seen_at: row.last_seen_at ? toIso(row.last_seen_at) : null,
   };
@@ -131,7 +135,95 @@ export async function getUserById(id: string): Promise<AdminUserDto> {
     throw new HttpError(404, 'Администратор не найден');
   }
 
-  return toDto(row);
+  return { ...toDto(row), ...(await findAssignments(id)) };
+}
+
+interface AssignmentRow {
+  action: string;
+  user_login: string;
+  created_at: Date | string;
+  details: unknown;
+}
+
+function readDetails(value: unknown): Record<string, unknown> | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return typeof parsed === 'object' && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return typeof value === 'object' ? (value as Record<string, unknown>) : null;
+}
+
+/** Пара «было → стало» из details журнала. */
+function readPair(value: unknown): { from: unknown; to: unknown } | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const pair = value as { from?: unknown; to?: unknown };
+
+  return 'from' in pair || 'to' in pair
+    ? { from: pair.from ?? null, to: pair.to ?? null }
+    : null;
+}
+
+/**
+ * Кто и когда последним выдал роль и префикс. Отдельных колонок нет —
+ * берём из журнала действий (`user.role_change` / `access.user_update`).
+ */
+async function findAssignments(id: string): Promise<{
+  role_assigned_by_login: string | null;
+  role_assigned_at: string | null;
+  prefix_assigned_by_login: string | null;
+  prefix_assigned_at: string | null;
+}> {
+  const db = await getDb();
+  const result = await db.query<AssignmentRow>(
+    `SELECT action, user_login, created_at, details
+       FROM audit_log
+      WHERE entity_type = 'user'
+        AND entity_id = ?
+        AND action IN ('user.role_change', 'access.user_update')
+      ORDER BY created_at DESC
+      LIMIT 50`,
+    [id],
+  );
+
+  let role: { by: string; at: string } | null = null;
+  let prefix: { by: string; at: string } | null = null;
+
+  for (const row of result.rows) {
+    const details = readDetails(row.details);
+    const at = toIso(row.created_at);
+
+    if (!role) {
+      const pair =
+        row.action === 'user.role_change' ? readPair(details) : readPair(details?.role);
+
+      if (pair && pair.from !== pair.to) role = { by: row.user_login, at };
+    }
+
+    if (!prefix) {
+      const pair = readPair(details?.prefix);
+
+      if (pair && pair.from !== pair.to) prefix = { by: row.user_login, at };
+    }
+
+    if (role && prefix) break;
+  }
+
+  return {
+    role_assigned_by_login: role?.by ?? null,
+    role_assigned_at: role?.at ?? null,
+    prefix_assigned_by_login: prefix?.by ?? null,
+    prefix_assigned_at: prefix?.at ?? null,
+  };
 }
 
 export interface ListUsersResult {

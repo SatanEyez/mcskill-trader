@@ -25,6 +25,7 @@ import type {
   TicketStatus,
 } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
+import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { Modal } from '../components/ui/Modal';
 import { PageLoader, Spinner } from '../components/ui/Spinner';
@@ -483,9 +484,17 @@ export function AdminSupportPage() {
             </label>
 
             {selected.replied_by_login && (
-              <p className="text-[10px] text-slate-600">
-                Последний ответ: {selected.replied_by_login}
-                {selected.replied_at ? ` · ${formatDateTimeMsk(selected.replied_at)}` : ''}
+              <p className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                <AdminAvatar
+                  login={selected.replied_by_login}
+                  avatarUrl={selected.replied_by_avatar_url}
+                  size="xs"
+                  initials={1}
+                />
+                <span>
+                  Последний ответ: {selected.replied_by_login}
+                  {selected.replied_at ? ` · ${formatDateTimeMsk(selected.replied_at)}` : ''}
+                </span>
               </p>
             )}
           </div>

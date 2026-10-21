@@ -41,6 +41,7 @@ export interface ImportSummary {
 export interface ImportJobDto {
   id: string;
   actor_login: string;
+  actor_avatar_url: string | null;
   status: 'running' | 'done' | 'failed';
   source_name: string | null;
   total_items: number;
@@ -57,6 +58,7 @@ export interface ImportJobDto {
 interface ImportJobRow {
   id: string;
   actor_login: string;
+  actor_avatar_url: string | null;
   status: 'running' | 'done' | 'failed';
   source_name: string | null;
   total_items: number | string;
@@ -89,6 +91,7 @@ function toJobDto(row: ImportJobRow): ImportJobDto {
   return {
     id: row.id,
     actor_login: row.actor_login,
+    actor_avatar_url: row.actor_avatar_url || null,
     status: row.status,
     source_name: row.source_name,
     total_items: Number(row.total_items),
@@ -530,7 +533,11 @@ export async function runPriceImport(
 export async function listImportJobs(limit = 20): Promise<ImportJobDto[]> {
   const db = await getDb();
   const result = await db.query<ImportJobRow>(
-    `SELECT * FROM import_jobs ORDER BY started_at DESC LIMIT ?`,
+    `SELECT j.*,
+            (SELECT u.avatar_url FROM admin_users AS u WHERE u.login = j.actor_login) AS actor_avatar_url
+       FROM import_jobs AS j
+      ORDER BY j.started_at DESC
+      LIMIT ?`,
     [limit],
   );
 

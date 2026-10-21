@@ -51,6 +51,7 @@ function toDto(row: AuditLogRow): AuditLogDto {
     created_at: toIso(row.created_at),
     user_id: row.user_id,
     user_login: row.user_login,
+    user_avatar_url: row.user_avatar_url || null,
     action: row.action,
     entity_type: row.entity_type,
     entity_id: row.entity_id,
@@ -152,6 +153,7 @@ export async function listAudit(query: ListAuditQuery): Promise<AuditListResult>
             details,
             ip,
             user_agent,
+            (SELECT u.avatar_url FROM admin_users AS u WHERE u.id = audit_log.user_id) AS user_avatar_url,
             COUNT(*) OVER() AS total_count
        FROM audit_log
        ${whereSql}

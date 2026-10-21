@@ -2,6 +2,7 @@ import { ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Logo } from '../layout/Logo';
+import { AdminAvatar } from './AdminAvatar';
 import { ChangePasswordButton } from './ChangePasswordModal';
 
 export function AdminHeader() {
@@ -34,25 +35,13 @@ export function AdminHeader() {
               className="hidden max-w-[220px] items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 transition hover:border-white/20 hover:bg-white/[0.05] sm:inline-flex"
               title="Мой профиль"
             >
-              <span
-                className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-lg border text-[10px] font-semibold uppercase"
-                style={{
-                  color: prefixColor,
-                  borderColor: `${prefixColor}55`,
-                  backgroundColor: `${prefixColor}14`,
-                }}
-              >
-                {user.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    aria-hidden
-                  />
-                ) : (
-                  user.login.slice(0, 1)
-                )}
-              </span>
+              <AdminAvatar
+                login={user.login}
+                avatarUrl={user.avatar_url}
+                color={prefixColor}
+                size="sm"
+                initials={1}
+              />
               <span className="min-w-0">
                 <span
                   className="block truncate text-xs font-semibold"

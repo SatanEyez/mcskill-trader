@@ -24,6 +24,7 @@ import { useAdminUsers } from '../hooks/useAdminUsers';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import type { AuditGroup, AuditPeriod } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
+import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { PageLoader, Spinner } from '../components/ui/Spinner';
 
@@ -281,7 +282,15 @@ export function AdminLogsPage() {
 
                       <div className="min-w-0 flex-1">
                         <p className="text-sm leading-relaxed text-slate-300">
-                          <span className="font-semibold text-white">{entry.user_login}</span>{' '}
+                          <span className="inline-flex items-center gap-1.5 align-middle">
+                            <AdminAvatar
+                              login={entry.user_login}
+                              avatarUrl={entry.user_avatar_url}
+                              size="xs"
+                              initials={1}
+                            />
+                            <span className="font-semibold text-white">{entry.user_login}</span>
+                          </span>{' '}
                           {meta.label}
                           {shouldShowEntityLabel(entry.action, entityName, entry.user_login) && (
                             <> «<span className="text-slate-100">{entityName}</span>»</>

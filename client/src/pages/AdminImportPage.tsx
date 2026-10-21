@@ -13,6 +13,7 @@ import { ApiError, fetchImportJobs, importPrices } from '../lib/api';
 import { formatDateTimeMsk } from '../lib/format';
 import type { ImportJob, ImportSummary } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
+import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -309,7 +310,15 @@ export function AdminImportPage() {
                         {formatDateTimeMsk(job.started_at)}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">
-                        {job.actor_login}
+                        <span className="inline-flex items-center gap-1.5">
+                          <AdminAvatar
+                            login={job.actor_login}
+                            avatarUrl={job.actor_avatar_url}
+                            size="xs"
+                            initials={1}
+                          />
+                          {job.actor_login}
+                        </span>
                       </td>
                       <td className="max-w-[220px] truncate px-4 py-2.5 text-xs text-slate-400" title={job.source_name ?? ''}>
                         {job.source_name ?? '—'}

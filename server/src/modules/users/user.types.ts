@@ -58,6 +58,11 @@ export interface AdminUserDto {
   reviewed_at: string | null;
   reviewed_by: string | null;
   reviewed_by_login: string | null;
+  /** Кто последним менял роль и префикс (из журнала действий). */
+  role_assigned_by_login: string | null;
+  role_assigned_at: string | null;
+  prefix_assigned_by_login: string | null;
+  prefix_assigned_at: string | null;
   last_login_at: string | null;
   last_seen_at: string | null;
 }
