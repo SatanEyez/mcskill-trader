@@ -31,7 +31,7 @@ async function loadResources(ids: string[]): Promise<Map<string, TradeResourceRo
   if (ids.length === 0) return new Map();
 
   const db = await getDb();
-  const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  const placeholders = ids.map(() => '?').join(', ');
   const result = await db.query<TradeResourceRow>(
     `SELECT r.id,
             r.name,

@@ -1,19 +1,16 @@
 CREATE TABLE IF NOT EXISTS resources (
-  id UUID PRIMARY KEY,
+  id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   name VARCHAR(120) NOT NULL,
-  min_price NUMERIC(18, 2) NOT NULL CHECK (min_price > 0),
-  image_url TEXT NOT NULL DEFAULT '',
+  min_price DECIMAL(18, 2) NOT NULL,
+  image_url VARCHAR(512) NOT NULL DEFAULT '',
   category VARCHAR(60) NOT NULL DEFAULT 'Разное',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Названия предметов не должны дублироваться (без учёта регистра).
-CREATE UNIQUE INDEX IF NOT EXISTS resources_name_unique_idx
-  ON resources (LOWER(name));
-
-CREATE INDEX IF NOT EXISTS resources_category_idx
-  ON resources (category);
-
-CREATE INDEX IF NOT EXISTS resources_price_idx
-  ON resources (min_price);
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  -- Сравнение по умолчанию регистронезависимое (utf8mb4_0900_ai_ci),
+  -- поэтому названия уникальны без учёта регистра.
+  UNIQUE KEY resources_name_unique_idx (name),
+  KEY resources_category_idx (category),
+  KEY resources_price_idx (min_price),
+  CONSTRAINT resources_min_price_check CHECK (min_price > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

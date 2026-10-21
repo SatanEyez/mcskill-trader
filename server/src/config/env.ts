@@ -1,10 +1,19 @@
-import 'dotenv/config';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { z } from 'zod';
 
-const booleanFromString = z
-  .enum(['true', 'false'])
-  .default('false')
-  .transform((value) => value === 'true');
+/**
+ * Настройки подключения к MySQL живут в одном файле в корне репозитория
+ * (`mysql-connection.env`) — его же читают phpMyAdmin и mysql-connect.cmd.
+ * dotenv не перезаписывает уже заданные переменные, поэтому файл загружаем
+ * первым: его значения важнее, чем `server/.env`.
+ */
+const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+dotenv.config({ path: `${repoRoot}mysql-connection.env` });
+dotenv.config({ path: `${repoRoot}server/.env` });
+// На случай запуска из каталога server (npm run dev --workspace server).
+dotenv.config();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -21,9 +30,19 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16).default('local-dev-secret-please-change-in-production-2026'),
   JWT_EXPIRES_IN: z.string().default('12h'),
 
-  DATABASE_URL: z.string().optional(),
-  DATABASE_SSL: booleanFromString,
-  PGLITE_DATA_DIR: z.string().default('./data/pglite'),
+  MYSQL_HOST: z.string().default('127.0.0.1'),
+  MYSQL_PORT: z.coerce.number().int().positive().default(3306),
+  MYSQL_USER: z.string().default('mcskill'),
+  MYSQL_PASSWORD: z.string().default('mcskill'),
+  MYSQL_DATABASE: z.string().default('mcskill_trader'),
+  MYSQL_CONNECTION_LIMIT: z.coerce.number().int().positive().default(10),
+  /** Облачные MySQL (Aiven, TiDB, PlanetScale, Railway) пускают только по TLS. */
+  MYSQL_SSL: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  /** Путь к CA-сертификату провайдера, если он не входит в системные. */
+  MYSQL_SSL_CA: z.string().optional(),
   UPLOAD_DIR: z.string().default('./uploads'),
   SEED_ON_START: z
     .enum(['true', 'false'])

@@ -2,8 +2,11 @@ node_modules/
 dist/
 .env
 .env.local
-server/data/
-server/uploads/
+mysql-connection.env
+# Пользовательские загрузки не коммитим, но иконки прайса — это данные каталога,
+# они должны переживать клон и деплой (Render пересоздаёт файловую систему).
+server/uploads/*
+!server/uploads/prices/
 *.log
 *.tsbuildinfo
 .DS_Store

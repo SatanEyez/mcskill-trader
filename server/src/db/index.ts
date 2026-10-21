@@ -1,12 +1,11 @@
-import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
-import pg from 'pg';
+import { readFileSync } from 'node:fs';
+import mysql, {
+  type Pool,
+  type PoolConnection,
+  type ResultSetHeader,
+} from 'mysql2/promise';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
-import { acquireDbLock, type DbLock } from './lock.js';
-
-const { Pool } = pg;
 
 export interface QueryResult<T> {
   rows: T[];
@@ -18,107 +17,127 @@ export interface Database {
     sql: string,
     params?: unknown[],
   ): Promise<QueryResult<T>>;
+  /** Выполняет один DDL/DML-оператор без параметров. */
   exec(sql: string): Promise<void>;
+  /** Выполняет колбэк в транзакции: при ошибке изменения откатываются. */
+  transaction<T>(fn: (db: Database) => Promise<T>): Promise<T>;
   close(): Promise<void>;
 }
 
-class PGliteDatabase implements Database {
-  constructor(private readonly client: PGlite) {}
+type Executor = Pool | PoolConnection;
 
-  async query<T = Record<string, unknown>>(
+async function runQuery<T>(
+  executor: Executor,
+  sql: string,
+  params: unknown[],
+): Promise<QueryResult<T>> {
+  const [result] = await executor.query(sql, params);
+
+  if (Array.isArray(result)) {
+    return { rows: result as T[], rowCount: result.length };
+  }
+
+  const header = result as ResultSetHeader;
+  return { rows: [], rowCount: header.affectedRows ?? 0 };
+}
+
+class MySqlDatabase implements Database {
+  /** Соединение внутри транзакции; у пула его нет. */
+  constructor(
+    private readonly executor: Executor,
+    private readonly pool: Pool | null = null,
+  ) {}
+
+  query<T = Record<string, unknown>>(
     sql: string,
     params: unknown[] = [],
   ): Promise<QueryResult<T>> {
-    const result = await this.client.query<T>(sql, params as never[]);
-    return {
-      rows: result.rows,
-      rowCount: result.affectedRows ?? result.rows.length,
-    };
+    return runQuery<T>(this.executor, sql, params);
   }
 
   async exec(sql: string): Promise<void> {
-    await this.client.exec(sql);
+    await this.executor.query(sql);
   }
 
-  async close(): Promise<void> {
-    await this.client.close();
-  }
-}
-
-class PostgresDatabase implements Database {
-  constructor(private readonly pool: pg.Pool) {}
-
-  async query<T = Record<string, unknown>>(
-    sql: string,
-    params: unknown[] = [],
-  ): Promise<QueryResult<T>> {
-    const result = await this.pool.query(sql, params as never[]);
-    return {
-      rows: result.rows as T[],
-      rowCount: result.rowCount ?? result.rows.length,
-    };
-  }
-
-  async exec(sql: string): Promise<void> {
-    await this.pool.query(sql);
-  }
-
-  async close(): Promise<void> {
-    await this.pool.end();
-  }
-}
-
-async function createDatabase(): Promise<Database> {
-  if (env.DATABASE_URL) {
-    logger.info('Подключение к PostgreSQL по DATABASE_URL');
-    const pool = new Pool({
-      connectionString: env.DATABASE_URL,
-      ssl: env.DATABASE_SSL ? { rejectUnauthorized: false } : undefined,
-      max: 10,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-    });
-
-    await pool.query('SELECT 1');
-    return new PostgresDatabase(pool);
-  }
-
-  const dataDir = resolve(env.PGLITE_DATA_DIR);
-  await mkdir(dataDir, { recursive: true });
-
-  // Один процесс на каталог данных: иначе PGlite повреждает WAL.
-  dbLock = await acquireDbLock(`${dataDir}.lock`);
-
-  try {
-    logger.info(`Встроенный PostgreSQL (PGlite): ${dataDir}`);
-
-    const client = new PGlite(dataDir);
-    await client.waitReady;
-    return new PGliteDatabase(client);
-  } catch (error) {
-    await dbLock.release();
-    dbLock = null;
-
-    if (error instanceof Error && /Aborted/i.test(error.message)) {
-      throw new Error(
-        'PGlite не смогла открыть каталог данных: он повреждён (жёсткое завершение процесса ' +
-          'или два API на одной базе). Остановите все процессы API, переименуйте ' +
-          `«${dataDir}» в архивный каталог и запустите сервер заново — миграции и демо-данные ` +
-          'применятся автоматически.',
-      );
+  async transaction<T>(fn: (db: Database) => Promise<T>): Promise<T> {
+    if (!this.pool) {
+      // Мы уже внутри транзакции — вложенности MySQL не поддерживает.
+      return fn(this);
     }
 
-    throw error;
+    const connection = await this.pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const result = await fn(new MySqlDatabase(connection));
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.pool?.end();
   }
 }
 
 let databasePromise: Promise<Database> | null = null;
-let dbLock: DbLock | null = null;
+
+async function createDatabase(): Promise<Database> {
+  // Облачные MySQL принимают подключения только по TLS.
+  const ssl = env.MYSQL_SSL
+    ? {
+        ...(env.MYSQL_SSL_CA ? { ca: readFileSync(env.MYSQL_SSL_CA, 'utf8') } : {}),
+        rejectUnauthorized: true,
+      }
+    : undefined;
+
+  const pool: Pool = mysql.createPool({
+    host: env.MYSQL_HOST,
+    port: env.MYSQL_PORT,
+    user: env.MYSQL_USER,
+    password: env.MYSQL_PASSWORD,
+    database: env.MYSQL_DATABASE,
+    charset: 'utf8mb4',
+    // Все DATETIME в базе храним в UTC, драйвер читает их тоже как UTC.
+    timezone: 'Z',
+    ...(ssl ? { ssl } : {}),
+    waitForConnections: true,
+    connectionLimit: env.MYSQL_CONNECTION_LIMIT,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    supportBigNumbers: true,
+    bigNumberStrings: false,
+  });
+
+  try {
+    await pool.query('SELECT 1');
+  } catch (error) {
+    await pool.end();
+    throw error;
+  }
+
+  logger.info(
+    `MySQL: ${env.MYSQL_USER}@${env.MYSQL_HOST}:${env.MYSQL_PORT}/${env.MYSQL_DATABASE}`,
+  );
+
+  return new MySqlDatabase(pool, pool);
+}
 
 export function getDb(): Promise<Database> {
   if (!databasePromise) {
     databasePromise = createDatabase();
+
+    // Неудачное подключение не должно навсегда «залипнуть» в кеше промиса.
+    databasePromise.catch(() => {
+      databasePromise = null;
+    });
   }
+
   return databasePromise;
 }
 
@@ -128,11 +147,6 @@ export async function closeDb(): Promise<void> {
   const database = await databasePromise;
   await database.close();
   databasePromise = null;
-
-  if (dbLock) {
-    await dbLock.release();
-    dbLock = null;
-  }
 
   logger.info('Соединение с базой данных закрыто');
 }

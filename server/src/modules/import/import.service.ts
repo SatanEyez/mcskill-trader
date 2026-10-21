@@ -251,22 +251,18 @@ async function nextCategoryId(
   const cached = cache.get(key);
   if (cached) return cached;
 
-  const existing = await db.query<{ id: string }>(
-    'SELECT id FROM categories WHERE LOWER(name) = LOWER($1)',
-    [name],
-  );
+  const existing = await db.query<{ id: string }>('SELECT id FROM categories WHERE name = ?', [
+    name,
+  ]);
 
   if (existing.rows[0]) {
     cache.set(key, existing.rows[0].id);
     return existing.rows[0].id;
   }
 
-  const created = await db.query<{ id: string }>(
-    'INSERT INTO categories (id, name) VALUES ($1, $2) RETURNING id',
-    [randomUUID(), name],
-  );
+  const id = randomUUID();
+  await db.query('INSERT INTO categories (id, name) VALUES (?, ?)', [id, name]);
 
-  const id = created.rows[0]!.id;
   cache.set(key, id);
   return id;
 }
@@ -274,7 +270,7 @@ async function nextCategoryId(
 async function ensureSyncedActor(): Promise<{ id: string; login: string }> {
   const db = await getDb();
   const result = await db.query<{ id: string; login: string }>(
-    "SELECT id, login FROM admin_users WHERE LOWER(login) = 'synced_' LIMIT 1",
+    "SELECT id, login FROM admin_users WHERE login = 'synced_' LIMIT 1",
   );
 
   if (!result.rows[0]) {
@@ -301,7 +297,7 @@ export async function runPriceImport(
 
   await db.query(
     `INSERT INTO import_jobs (id, actor_login, status, source_name, started_at)
-     VALUES ($1, $2, 'running', $3, NOW())`,
+     VALUES (?, ?, 'running', ?, CURRENT_TIMESTAMP(3))`,
     [jobId, actor.login, sourceName],
   );
 
@@ -422,14 +418,14 @@ export async function runPriceImport(
 
         await db.query(
           `UPDATE resources
-              SET name_color = $2,
-                  min_price = $3,
-                  image_url = $4,
-                  category_id = $5,
-                  source_key = $6,
-                  updated_at = NOW()
-            WHERE id = $1`,
-          [existingId, nameColor, storedPrice, imageUrl, categoryId, sourceKey],
+              SET name_color = ?,
+                  min_price = ?,
+                  image_url = ?,
+                  category_id = ?,
+                  source_key = ?,
+                  updated_at = CURRENT_TIMESTAMP(3)
+            WHERE id = ?`,
+          [nameColor, storedPrice, imageUrl, categoryId, sourceKey, existingId],
         );
         existingBySource.set(sourceKey, existingId);
         updated += 1;
@@ -438,7 +434,7 @@ export async function runPriceImport(
         await db.query(
           `INSERT INTO resources
              (id, name, name_color, min_price, image_url, category_id, source_key)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [id, name, nameColor, storedPrice, imageUrl, categoryId, sourceKey],
         );
         existingBySource.set(sourceKey, id);
@@ -449,17 +445,16 @@ export async function runPriceImport(
     await db.query(
       `UPDATE import_jobs
           SET status = 'done',
-              total_items = $2,
-              created_count = $3,
-              updated_count = $4,
-              skipped_count = $5,
-              image_count = $6,
-              error_count = $7,
-              errors = $8::jsonb,
-              finished_at = NOW()
-        WHERE id = $1`,
+              total_items = ?,
+              created_count = ?,
+              updated_count = ?,
+              skipped_count = ?,
+              image_count = ?,
+              error_count = ?,
+              errors = ?,
+              finished_at = CURRENT_TIMESTAMP(3)
+        WHERE id = ?`,
       [
-        jobId,
         total,
         created,
         updated,
@@ -467,6 +462,7 @@ export async function runPriceImport(
         images,
         errors.length,
         JSON.stringify(errors),
+        jobId,
       ],
     );
 
@@ -503,16 +499,16 @@ export async function runPriceImport(
       .query(
         `UPDATE import_jobs
             SET status = 'failed',
-                total_items = $2,
-                created_count = $3,
-                updated_count = $4,
-                skipped_count = $5,
-                image_count = $6,
-                error_count = $7,
-                errors = $8::jsonb,
-                finished_at = NOW()
-          WHERE id = $1`,
-        [jobId, total, created, updated, skipped, images, 1, JSON.stringify([message])],
+                total_items = ?,
+                created_count = ?,
+                updated_count = ?,
+                skipped_count = ?,
+                image_count = ?,
+                error_count = ?,
+                errors = ?,
+                finished_at = CURRENT_TIMESTAMP(3)
+          WHERE id = ?`,
+        [total, created, updated, skipped, images, 1, JSON.stringify([message]), jobId],
       )
       .catch((dbError) => logger.error('Не удалось обновить статус импорта:', dbError));
 
@@ -534,7 +530,7 @@ export async function runPriceImport(
 export async function listImportJobs(limit = 20): Promise<ImportJobDto[]> {
   const db = await getDb();
   const result = await db.query<ImportJobRow>(
-    `SELECT * FROM import_jobs ORDER BY started_at DESC LIMIT $1`,
+    `SELECT * FROM import_jobs ORDER BY started_at DESC LIMIT ?`,
     [limit],
   );
 

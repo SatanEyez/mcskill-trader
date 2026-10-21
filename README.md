@@ -16,16 +16,25 @@
 |---|---|
 | Frontend | React 18, TypeScript, Vite 6, Tailwind 3.4, React Router 6, lucide-react |
 | Backend | Node 20+, Express 4.21 (ESM, NodeNext), Zod, JWT, helmet, express-rate-limit |
-| БД | PGlite по умолчанию (файлы в `server/data/pglite`), PostgreSQL 16 через `DATABASE_URL` |
+| БД | MySQL 8.0+ (драйвер `mysql2`), схема — `server/migrations/*.sql` |
 | Архитектура | routes → controller → service → db, валидация Zod, JSON в **snake_case** |
 
 Полезные команды: `npm run dev`, `npm run build`, `npm run typecheck --workspace server|client`, `npm run db:seed[:force]`, `npm run test:api`.
 
 ## Быстрый старт
 
+Нужен запущенный MySQL 8.0+ и база `mcskill_trader`:
+
+```sql
+CREATE DATABASE mcskill_trader CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'mcskill'@'localhost' IDENTIFIED BY 'mcskill';
+GRANT ALL PRIVILEGES ON mcskill_trader.* TO 'mcskill'@'localhost';
+```
+
 ```powershell
 npm install
-Copy-Item .env.example server\.env   # при необходимости поправьте пароль и JWT_SECRET
+Copy-Item .env.example server\.env   # поправьте JWT_SECRET и ADMIN_PASSWORD
+Copy-Item mysql-connection.env.example mysql-connection.env  # логин/пароль MySQL
 npm run dev                          # API :4000 + Vite :5173
 ```
 
@@ -38,10 +47,8 @@ npm run dev                          # API :4000 + Vite :5173
 учёт в `schema_migrations`). Демо-данные засеиваются, если база пуста
 (`SEED_ON_START=true`).
 
-> PGlite держит каталог данных одним процессом — не поднимайте второй API на той же базе,
-> в том числе повторно `npm run dev`, если стек уже запущен. Проверить занятость портов:
-> `Get-NetTCPConnection -LocalPort 4000,5173`. Жёсткое завершение процесса во время записи
-> тоже повреждает WAL, поэтому API закрывает базу по SIGINT/SIGTERM.
+> MySQL работает как отдельный сервис: API можно перезапускать сколько угодно,
+> данные сохраняются. Проверить, что база слушает порт: `Get-NetTCPConnection -LocalPort 3306`.
 
 ## Доступ в админку
 
@@ -84,24 +91,85 @@ npm run dev                          # API :4000 + Vite :5173
 | `ADMIN_PASSWORD` | пароль владельца (создание при первом запуске) | `change-me-strong-password` |
 | `JWT_SECRET` | секрет подписи JWT (≥16 символов) | dev-значение |
 | `JWT_EXPIRES_IN` | срок жизни токена | `12h` |
-| `DATABASE_URL` | строка подключения к PostgreSQL; если не задана — PGlite | — |
-| `DATABASE_SSL` | `true` для SSL к внешней БД | `false` |
-| `PGLITE_DATA_DIR` | каталог данных PGlite | `./data/pglite` |
 | `UPLOAD_DIR` | каталог загруженных картинок (отдаётся по `/uploads/<файл>`) | `./uploads` |
 | `SEED_ON_START` | засеивать демо-данными при пустой базе | `true` |
+
+Параметры MySQL (`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`,
+`MYSQL_CONNECTION_LIMIT`) задаются отдельно — в `mysql-connection.env` в корне проекта (см. выше).
 
 В продакшене обязательно смените `ADMIN_LOGIN`, `ADMIN_PASSWORD` и `JWT_SECRET` — при дефолтных
 значениях сервер пишет предупреждения в лог.
 
-## PostgreSQL вместо PGlite
+## MySQL и phpMyAdmin
 
-```powershell
-docker compose up -d          # PostgreSQL 16 на :5432
-# server/.env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mcskill_trader
+Схема создаётся миграциями при старте API — вручную создавать таблицы не нужно.
+
+### Настройки подключения — `mysql-connection.env`
+
+Все логины и пароли к базе хранятся в одном файле в корне проекта:
+
+```ini
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=mcskill
+MYSQL_PASSWORD=change-me
+MYSQL_DATABASE=mcskill_trader
+MYSQL_SSL=false
 ```
 
-Схема создаётся миграциями при старте API. PGlite и PostgreSQL используют один и тот же SQL.
+Его читают **API**, **phpMyAdmin** и **`mysql-connect.cmd`** — править нужно только здесь.
+После изменения перезапустите API (`Ctrl+C` → `npm run dev`) и обновите страницу phpMyAdmin.
+
+Консольный клиент MySQL с этими же настройками (двойной клик по `mysql-connect.cmd`):
+
+```powershell
+.\mysql-connect.cmd                                              # интерактивный SQL
+.\mysql-connect.cmd -Query "SELECT COUNT(*) FROM resources;"      # разовый запрос
+```
+
+Для облачной базы (`MYSQL_SSL=true`, например TiDB) `mysql-connect.cmd` сам запускает
+`mysql-cli.mjs` на `mysql2`: `mysql.exe` 9.x не поддерживает `mysql_native_password`,
+который использует TiDB. Напрямую: `node mysql-cli.mjs --query "SELECT 1" [--json]`.
+
+**Вариант 1 — локальный MySQL (Windows, без установки службы):**
+
+```powershell
+# база и пользователь (из корня проекта)
+mysql -u root -h 127.0.0.1 -P 3306 -e "CREATE DATABASE IF NOT EXISTS mcskill_trader CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+mysql -u root -h 127.0.0.1 -P 3306 -e "CREATE USER IF NOT EXISTS 'mcskill'@'localhost' IDENTIFIED BY 'mcskill'; GRANT ALL PRIVILEGES ON mcskill_trader.* TO 'mcskill'@'localhost';"
+```
+
+**Вариант 2 — Docker:**
+
+```powershell
+docker compose up -d          # MySQL 8.4 на :3306, база и пользователь создаются сами
+```
+
+**Вариант 3 — TiDB Cloud Starter (облако, бесплатный тариф):**
+
+1. Создайте кластер на https://tidbcloud.com и базу `mcskill_trader` (кодировка `utf8mb4`, collation `utf8mb4_0900_ai_ci`).
+2. В `mysql-connection.env` укажите host/port/user/password из консоли TiDB и включите TLS:
+
+   ```ini
+   MYSQL_HOST=gateway01.<регион>.prod.aws.tidbcloud.com
+   MYSQL_PORT=4000
+   MYSQL_USER=<user>.root
+   MYSQL_PASSWORD=<пароль>
+   MYSQL_DATABASE=mcskill_trader
+   MYSQL_SSL=true
+   ```
+
+3. Запустите API — миграции применятся сами.
+
+TiDB совместим с MySQL не полностью, поэтому мигратор пропускает операторы, перед которыми
+стоит комментарий `-- @tidb: skip` (сейчас это `CHECK`-ограничения: TiDB их не хранит).
+Генерируемая колонка `resources.name_manual_key` объявлена как `VIRTUAL` — только так её
+можно добавить через `ALTER TABLE` и в MySQL, и в TiDB.
+
+**phpMyAdmin** (веб-интерфейс к базе): http://127.0.0.1:8081
+Логин `root` (пароль пустой в локальной сборке) или `mcskill` / `mcskill`; для TiDB — логин/пароль
+из `mysql-connection.env` (phpMyAdmin читает этот же файл и сам включает TLS).
+Запуск: `php -S 127.0.0.1:8081 -t C:\Users\<user>\phpmyadmin-stack\phpmyadmin`.
 
 ## API
 

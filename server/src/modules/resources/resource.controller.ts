@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import type { z } from 'zod';
 import { asyncHandler } from '../../utils/async-handler.js';
+import { requireUuid } from '../../utils/uuid.js';
 import { logAction } from '../audit/audit.service.js';
 import { createResourceSchema, updateResourceSchema } from './resource.schema.js';
 import * as resourceService from './resource.service.js';
@@ -20,7 +21,7 @@ interface FieldChange {
 }
 
 function getId(req: Request): string {
-  return req.params.id as string;
+  return requireUuid(req.params.id as string, 'идентификатор ресурса');
 }
 
 /** Только реально изменённые поля — чтобы в журнале не было шума. */

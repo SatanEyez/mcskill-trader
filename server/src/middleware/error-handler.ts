@@ -4,11 +4,19 @@ import { isProduction } from '../config/env.js';
 import { HttpError } from '../utils/http-error.js';
 import { logger } from '../utils/logger.js';
 
-interface PostgresError extends Error {
+/** Ошибка mysql2: code — символическое имя, errno — числовой код. */
+interface MySqlError extends Error {
   code?: string;
-  detail?: string;
-  constraint?: string;
+  errno?: number;
+  sqlMessage?: string;
 }
+
+const ER_DUP_ENTRY = 1062;
+const ER_NO_REFERENCED_ROW = 1452;
+const ER_ROW_IS_REFERENCED = 1451;
+const ER_DATA_TOO_LONG = 1406;
+const ER_TRUNCATED_WRONG_VALUE = 1366;
+const ER_CHECK_CONSTRAINT_VIOLATED = 3819;
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (res.headersSent) return;
@@ -46,11 +54,14 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     return;
   }
 
-  const pgError = error as PostgresError;
+  const dbError = error as MySqlError;
+  const message = dbError.sqlMessage ?? dbError.message ?? '';
 
-  if (pgError.code === '23505') {
-    const isCategory = pgError.constraint?.includes('categories') ?? false;
-    const isAdminUser = pgError.constraint?.includes('admin_users') ?? false;
+  if (dbError.errno === ER_DUP_ENTRY) {
+    const isCategory = /categories/i.test(message);
+    const isAdminUser = /admin_users/i.test(message);
+    const isPrefix = /admin_prefixes/i.test(message);
+    const isRole = /admin_roles/i.test(message);
 
     res.status(409).json({
       error: {
@@ -58,22 +69,40 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
           ? 'Такой логин уже занят'
           : isCategory
             ? 'Категория с таким названием уже существует'
-            : 'Ресурс с таким названием уже существует',
+            : isPrefix
+              ? 'Префикс с таким названием уже существует'
+              : isRole
+                ? 'Роль с таким кодом или названием уже существует'
+                : 'Ресурс с таким названием уже существует',
       },
     });
     return;
   }
 
-  if (pgError.code === '22P02') {
+  if (dbError.errno === ER_NO_REFERENCED_ROW) {
     res.status(400).json({
-      error: { message: 'Некорректный идентификатор' },
+      error: { message: 'Связанная запись не найдена' },
     });
     return;
   }
 
-  if (pgError.code === '23503') {
+  if (dbError.errno === ER_ROW_IS_REFERENCED) {
+    res.status(409).json({
+      error: { message: 'Запись используется другими данными' },
+    });
+    return;
+  }
+
+  if (dbError.errno === ER_DATA_TOO_LONG || dbError.errno === ER_TRUNCATED_WRONG_VALUE) {
     res.status(400).json({
-      error: { message: 'Связанная запись не найдена' },
+      error: { message: 'Значение поля слишком длинное или имеет неверный формат' },
+    });
+    return;
+  }
+
+  if (dbError.errno === ER_CHECK_CONSTRAINT_VIOLATED) {
+    res.status(400).json({
+      error: { message: 'Значение не проходит проверку ограничений' },
     });
     return;
   }

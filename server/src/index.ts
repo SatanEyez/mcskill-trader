@@ -53,8 +53,8 @@ async function bootstrap(): Promise<void> {
         });
     });
 
-    // Keep-alive соединения браузера не дают server.close() завершиться, а без закрытия
-    // PGlite WAL может остаться в несогласованном состоянии — база не откроется снова.
+    // Keep-alive соединения браузера не дают server.close() завершиться —
+    // закрываем их, чтобы процесс остановился без ожидания таймаутов.
     server.closeIdleConnections();
 
     const forceConnections = setTimeout(() => {

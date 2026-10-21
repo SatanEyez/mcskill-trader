@@ -93,7 +93,7 @@ async function findUserByLogin(token, login) {
 
 const health = await api('/health');
 check('health 200', health.status === 200, json(health.body));
-check('health database', health.body?.database === 'pglite', json(health.body));
+check('health database', health.body?.database === 'mysql', json(health.body));
 
 const login = await api('/auth/login', {
   method: 'POST',

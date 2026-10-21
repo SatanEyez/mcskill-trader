@@ -25,20 +25,20 @@ export async function ensureBootstrapAdmin(): Promise<void> {
   // Догоняем старые строки, созданные до появления RBAC.
   await db.query(
     `UPDATE admin_users AS u
-        SET role_id = r.id
-       FROM admin_roles AS r
-      WHERE u.role_id IS NULL
-        AND ((u.role = 'owner' AND r.code = 'owner')
-          OR (u.role <> 'owner' AND r.code = 'administrator'))`,
+       JOIN admin_roles AS r
+         ON (u.role = 'owner' AND r.code = 'owner')
+         OR (u.role <> 'owner' AND r.code = 'administrator')
+        SET u.role_id = r.id
+      WHERE u.role_id IS NULL`,
   );
 
   await db.query(
     `UPDATE admin_users AS u
-        SET prefix_id = p.id
-       FROM admin_prefixes AS p
-      WHERE u.prefix_id IS NULL
-        AND ((u.role = 'owner' AND p.name = 'Владелец')
-          OR (u.role <> 'owner' AND p.name = 'Администратор'))`,
+       JOIN admin_prefixes AS p
+         ON (u.role = 'owner' AND p.name = 'Владелец')
+         OR (u.role <> 'owner' AND p.name = 'Администратор')
+        SET u.prefix_id = p.id
+      WHERE u.prefix_id IS NULL`,
   );
 
   // Восстановление включается явно в Environment сервиса Render.
@@ -47,7 +47,7 @@ export async function ensureBootstrapAdmin(): Promise<void> {
   if (recoveryLogin) {
     const completed = await db.query(
       `SELECT id FROM audit_log WHERE action = 'auth.owner_recovered'
-       AND LOWER(entity_label) = LOWER($1) LIMIT 1`,
+       AND entity_label = ? LIMIT 1`,
       [recoveryLogin],
     );
     if (completed.rows.length === 0) {
@@ -58,36 +58,51 @@ export async function ensureBootstrapAdmin(): Promise<void> {
       if (!roleId || !prefixId) {
         throw new Error('Не найдена роль или префикс владельца');
       }
+
+      const passwordHash = await hashPassword(password);
+
       // Изменение аккаунта и запись в журнал выполняются атомарно.
-      const recovered = await db.query<{ login: string }>(
-        `WITH recovered AS (
-           UPDATE admin_users
-           SET role = 'owner', status = 'approved', role_id = $1,
-               prefix_id = $2, password_hash = $3,
-               reviewed_at = NOW(), reviewed_by = NULL,
-               reviewed_by_login = 'deployment recovery',
-               updated_at = NOW(), password_changed_at = NOW()
-           WHERE LOWER(login) = LOWER($4) AND is_system = FALSE
-           RETURNING id, login
-         ), logged AS (
-           INSERT INTO audit_log
+      await db.transaction(async (tx) => {
+        const target = await tx.query<{ id: string; login: string }>(
+          'SELECT id, login FROM admin_users WHERE login = ? AND is_system = FALSE LIMIT 1',
+          [recoveryLogin],
+        );
+        const user = target.rows[0];
+
+        if (!user) {
+          throw new Error('Не найден неслужебный аккаунт для восстановления');
+        }
+
+        await tx.query(
+          `UPDATE admin_users
+              SET role = 'owner',
+                  status = 'approved',
+                  role_id = ?,
+                  prefix_id = ?,
+                  password_hash = ?,
+                  reviewed_at = CURRENT_TIMESTAMP(3),
+                  reviewed_by = NULL,
+                  reviewed_by_login = 'deployment recovery',
+                  updated_at = CURRENT_TIMESTAMP(3),
+                  password_changed_at = CURRENT_TIMESTAMP(3)
+            WHERE id = ?`,
+          [roleId, prefixId, passwordHash, user.id],
+        );
+
+        await tx.query(
+          `INSERT INTO audit_log
              (id, user_id, user_login, action, entity_type, entity_id, entity_label)
-           SELECT $5, id, 'deployment recovery', 'auth.owner_recovered',
-                  'user', id::text, login FROM recovered
-           RETURNING id
-         )
-         SELECT login FROM recovered WHERE EXISTS (SELECT 1 FROM logged)`,
-        [roleId, prefixId, await hashPassword(password), recoveryLogin, randomUUID()],
-      );
-      if (recovered.rows.length !== 1) {
-        throw new Error('Не найден неслужебный аккаунт для восстановления');
-      }
+           VALUES (?, ?, 'deployment recovery', 'auth.owner_recovered', 'user', ?, ?)`,
+          [randomUUID(), user.id, user.id, user.login],
+        );
+      });
+
       logger.info('Восстановлен доступ владельца; удалите ADMIN_RECOVERY_LOGIN из Environment');
     }
   }
 
   const existing = await db.query<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM admin_users WHERE is_system = FALSE',
+    'SELECT COUNT(*) AS count FROM admin_users WHERE is_system = FALSE',
   );
 
   if (Number(existing.rows[0]?.count ?? 0) > 0) return;
@@ -95,7 +110,7 @@ export async function ensureBootstrapAdmin(): Promise<void> {
   await db.query(
     `INSERT INTO admin_users
        (id, login, password_hash, role, status, reviewed_at, role_id, prefix_id)
-     VALUES ($1, $2, $3, 'owner', 'approved', NOW(), $4, $5)`,
+     VALUES (?, ?, ?, 'owner', 'approved', CURRENT_TIMESTAMP(3), ?, ?)`,
     [
       randomUUID(),
       env.ADMIN_LOGIN,

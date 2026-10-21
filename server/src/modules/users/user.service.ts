@@ -65,7 +65,7 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
       row.prefix_id && row.prefix_name && row.prefix_color
         ? { id: row.prefix_id, name: row.prefix_name, color: row.prefix_color }
         : null,
-    is_system: row.is_system,
+    is_system: Boolean(row.is_system),
     discord: row.discord,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
@@ -95,33 +95,34 @@ export async function findSessionUser(id: string): Promise<SessionUser | null> {
        FROM admin_users AS u
        LEFT JOIN admin_roles AS r ON r.id = u.role_id
        LEFT JOIN admin_prefixes AS p ON p.id = u.prefix_id
-      WHERE u.id = $1`,
+      WHERE u.id = ?`,
     [id],
   );
 
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+
+  return row ? { ...row, is_system: Boolean(row.is_system) } : null;
 }
 
 export async function findAuthUserByLogin(login: string): Promise<AdminUserRow | null> {
   const db = await getDb();
-  const result = await db.query<AdminUserRow>(
-    'SELECT * FROM admin_users WHERE LOWER(login) = LOWER($1)',
-    [login],
-  );
+  const result = await db.query<AdminUserRow>('SELECT * FROM admin_users WHERE login = ?', [login]);
+  const row = result.rows[0];
 
-  return result.rows[0] ?? null;
+  return row ? { ...row, is_system: Boolean(row.is_system) } : null;
 }
 
 export async function findAuthUserById(id: string): Promise<AdminUserRow | null> {
   const db = await getDb();
-  const result = await db.query<AdminUserRow>('SELECT * FROM admin_users WHERE id = $1', [id]);
+  const result = await db.query<AdminUserRow>('SELECT * FROM admin_users WHERE id = ?', [id]);
+  const row = result.rows[0];
 
-  return result.rows[0] ?? null;
+  return row ? { ...row, is_system: Boolean(row.is_system) } : null;
 }
 
 export async function getUserById(id: string): Promise<AdminUserDto> {
   const db = await getDb();
-  const result = await db.query<UserRowWithRelations>(`${USER_SELECT} WHERE u.id = $1`, [id]);
+  const result = await db.query<UserRowWithRelations>(`${USER_SELECT} WHERE u.id = ?`, [id]);
   const row = result.rows[0];
 
   if (!row) {
@@ -143,7 +144,7 @@ export async function listUsers(query: ListUsersQuery): Promise<ListUsersResult>
 
   if (query.status) {
     params.push(query.status);
-    conditions.push(`u.status = $${params.length}`);
+    conditions.push('u.status = ?');
   }
 
   const rows = await db.query<UserRowWithRelations>(
@@ -159,10 +160,10 @@ export async function listUsers(query: ListUsersQuery): Promise<ListUsersResult>
   );
 
   const counts = await db.query<UserCounts>(
-    `SELECT COUNT(*)::int AS total,
-            COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
-            COUNT(*) FILTER (WHERE status = 'approved')::int AS approved,
-            COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected
+    `SELECT COUNT(*) AS total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
+            COUNT(CASE WHEN status = 'approved' THEN 1 END) AS approved,
+            COUNT(CASE WHEN status = 'rejected' THEN 1 END) AS rejected
        FROM admin_users
       WHERE is_system = FALSE`,
   );
@@ -184,10 +185,9 @@ export async function listUsers(query: ListUsersQuery): Promise<ListUsersResult>
 export async function createPendingUser(login: string, passwordHash: string): Promise<AdminUserDto> {
   const db = await getDb();
 
-  const duplicate = await db.query<{ id: string }>(
-    'SELECT id FROM admin_users WHERE LOWER(login) = LOWER($1)',
-    [login],
-  );
+  const duplicate = await db.query<{ id: string }>('SELECT id FROM admin_users WHERE login = ?', [
+    login,
+  ]);
 
   if (duplicate.rows.length > 0) {
     throw new HttpError(409, 'Такой логин уже занят');
@@ -200,7 +200,7 @@ export async function createPendingUser(login: string, passwordHash: string): Pr
   const id = randomUUID();
   await db.query(
     `INSERT INTO admin_users (id, login, password_hash, role, status, role_id)
-     VALUES ($1, $2, $3, 'admin', 'pending', $4)`,
+     VALUES (?, ?, ?, 'admin', 'pending', ?)`,
     [id, login, passwordHash, role.rows[0]?.id ?? null],
   );
 
@@ -210,7 +210,9 @@ export async function createPendingUser(login: string, passwordHash: string): Pr
 export async function touchLastLogin(id: string): Promise<void> {
   const db = await getDb();
   await db.query(
-    'UPDATE admin_users SET last_login_at = NOW(), last_seen_at = NOW() WHERE id = $1',
+    `UPDATE admin_users
+        SET last_login_at = CURRENT_TIMESTAMP(3), last_seen_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
     [id],
   );
 }
@@ -223,9 +225,9 @@ export async function touchPresence(id: string): Promise<void> {
   const db = await getDb();
   await db.query(
     `UPDATE admin_users
-        SET last_seen_at = NOW()
-      WHERE id = $1
-        AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '60 seconds')`,
+        SET last_seen_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?
+        AND (last_seen_at IS NULL OR last_seen_at < CURRENT_TIMESTAMP(3) - INTERVAL 60 SECOND)`,
     [id],
   );
 }
@@ -234,11 +236,11 @@ export async function updatePasswordHash(id: string, passwordHash: string): Prom
   const db = await getDb();
   await db.query(
     `UPDATE admin_users
-        SET password_hash = $2,
-            password_changed_at = NOW(),
-            updated_at = NOW()
-      WHERE id = $1`,
-    [id, passwordHash],
+        SET password_hash = ?,
+            password_changed_at = CURRENT_TIMESTAMP(3),
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
+    [passwordHash, id],
   );
 }
 
@@ -254,12 +256,12 @@ export async function approveUser(id: string, actor: AuthPayload): Promise<Admin
   await db.query(
     `UPDATE admin_users
         SET status = 'approved',
-            reviewed_at = NOW(),
-            reviewed_by = $2,
-            reviewed_by_login = $3,
-            updated_at = NOW()
-      WHERE id = $1`,
-    [id, actor.sub, actor.login],
+            reviewed_at = CURRENT_TIMESTAMP(3),
+            reviewed_by = ?,
+            reviewed_by_login = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
+    [actor.sub, actor.login, id],
   );
 
   return getUserById(id);
@@ -284,12 +286,12 @@ export async function rejectUser(id: string, actor: AuthPayload): Promise<AdminU
   await db.query(
     `UPDATE admin_users
         SET status = 'rejected',
-            reviewed_at = NOW(),
-            reviewed_by = $2,
-            reviewed_by_login = $3,
-            updated_at = NOW()
-      WHERE id = $1`,
-    [id, actor.sub, actor.login],
+            reviewed_at = CURRENT_TIMESTAMP(3),
+            reviewed_by = ?,
+            reviewed_by_login = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
+    [actor.sub, actor.login, id],
   );
 
   return getUserById(id);
@@ -302,10 +304,9 @@ export interface ChangeRoleResult {
 
 async function roleIdForLegacy(role: AdminRole): Promise<string | null> {
   const db = await getDb();
-  const result = await db.query<{ id: string }>(
-    'SELECT id FROM admin_roles WHERE code = $1',
-    [role === 'owner' ? 'owner' : 'administrator'],
-  );
+  const result = await db.query<{ id: string }>('SELECT id FROM admin_roles WHERE code = ?', [
+    role === 'owner' ? 'owner' : 'administrator',
+  ]);
   return result.rows[0]?.id ?? null;
 }
 
@@ -341,8 +342,8 @@ export async function changeUserRole(
 
   const db = await getDb();
   await db.query(
-    'UPDATE admin_users SET role = $2, role_id = $3, updated_at = NOW() WHERE id = $1',
-    [id, role, await roleIdForLegacy(role)],
+    'UPDATE admin_users SET role = ?, role_id = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ?',
+    [role, await roleIdForLegacy(role), id],
   );
 
   return { data: await getUserById(id), previous };
@@ -376,10 +377,9 @@ export async function updateUserAccess(
   let roleCode: string | null = null;
 
   if (input.role_id) {
-    const role = await db.query<{ code: string }>(
-      'SELECT code FROM admin_roles WHERE id = $1',
-      [input.role_id],
-    );
+    const role = await db.query<{ code: string }>('SELECT code FROM admin_roles WHERE id = ?', [
+      input.role_id,
+    ]);
 
     if (!role.rows[0]) {
       throw new HttpError(400, 'Роль не найдена');
@@ -393,10 +393,9 @@ export async function updateUserAccess(
   }
 
   if (input.prefix_id) {
-    const prefix = await db.query<{ id: string }>(
-      'SELECT id FROM admin_prefixes WHERE id = $1',
-      [input.prefix_id],
-    );
+    const prefix = await db.query<{ id: string }>('SELECT id FROM admin_prefixes WHERE id = ?', [
+      input.prefix_id,
+    ]);
 
     if (!prefix.rows[0]) {
       throw new HttpError(400, 'Префикс не найден');
@@ -409,12 +408,12 @@ export async function updateUserAccess(
 
   await db.query(
     `UPDATE admin_users
-        SET role_id = $2,
-            prefix_id = $3,
-            role = $4,
-            updated_at = NOW()
-      WHERE id = $1`,
-    [id, input.role_id, input.prefix_id, roleCode === 'owner' ? 'owner' : 'admin'],
+        SET role_id = ?,
+            prefix_id = ?,
+            role = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
+    [input.role_id, input.prefix_id, roleCode === 'owner' ? 'owner' : 'admin', id],
   );
 
   return { data: await getUserById(id), previous };
@@ -432,7 +431,7 @@ export async function deleteUser(id: string, actor: AuthPayload): Promise<AdminU
   }
 
   const db = await getDb();
-  await db.query('DELETE FROM admin_users WHERE id = $1', [id]);
+  await db.query('DELETE FROM admin_users WHERE id = ?', [id]);
 
   return target;
 }

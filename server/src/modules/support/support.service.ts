@@ -86,13 +86,14 @@ export async function createTicket(
   meta: { ip: string | null; userAgent: string | null },
 ): Promise<SupportTicketDto> {
   const db = await getDb();
-  const result = await db.query<TicketRow>(
+  const id = randomUUID();
+
+  await db.query(
     `INSERT INTO support_tickets
        (id, kind, nick, discord, target, message, status, ip, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6, 'new', $7, $8)
-     RETURNING *`,
+     VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?)`,
     [
-      randomUUID(),
+      id,
       input.kind,
       input.nick,
       input.discord,
@@ -103,7 +104,7 @@ export async function createTicket(
     ],
   );
 
-  return toDto(result.rows[0]!);
+  return getTicket(id);
 }
 
 export interface TicketListResult {
@@ -118,29 +119,26 @@ export async function listTickets(query: ListTicketsQuery): Promise<TicketListRe
 
   if (query.status) {
     params.push(query.status);
-    conditions.push(`status = $${params.length}`);
+    conditions.push('status = ?');
   }
 
   if (query.kind) {
     params.push(query.kind);
-    conditions.push(`kind = $${params.length}`);
+    conditions.push('kind = ?');
   }
 
   if (query.search) {
-    params.push(`%${escapeLike(query.search)}%`);
-    const position = params.length;
+    const pattern = `%${escapeLike(query.search)}%`;
+    params.push(pattern, pattern, pattern, pattern);
     conditions.push(
-      `(nick ILIKE $${position} ESCAPE '!' OR discord ILIKE $${position} ESCAPE '!' ` +
-        `OR message ILIKE $${position} ESCAPE '!' OR target ILIKE $${position} ESCAPE '!')`,
+      "(nick LIKE ? ESCAPE '!' OR discord LIKE ? ESCAPE '!' " +
+        "OR message LIKE ? ESCAPE '!' OR target LIKE ? ESCAPE '!')",
     );
   }
 
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  params.push(query.limit);
-  const limitPosition = params.length;
-  params.push(query.offset);
-  const offsetPosition = params.length;
+  params.push(query.limit, query.offset);
 
   const result = await db.query<TicketRow>(
     `SELECT *, COUNT(*) OVER() AS total_count
@@ -148,7 +146,7 @@ export async function listTickets(query: ListTicketsQuery): Promise<TicketListRe
        ${whereSql}
       ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
                created_at DESC
-      LIMIT $${limitPosition} OFFSET $${offsetPosition}`,
+      LIMIT ? OFFSET ?`,
     params,
   );
 
@@ -161,11 +159,11 @@ export async function listTickets(query: ListTicketsQuery): Promise<TicketListRe
 export async function getTicketCounts(): Promise<TicketCounts> {
   const db = await getDb();
   const result = await db.query<TicketCounts>(
-    `SELECT COUNT(*)::int AS total,
-            COUNT(*) FILTER (WHERE status = 'new')::int AS new,
-            COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress,
-            COUNT(*) FILTER (WHERE status = 'answered')::int AS answered,
-            COUNT(*) FILTER (WHERE status = 'closed')::int AS closed
+    `SELECT COUNT(*) AS total,
+            COUNT(CASE WHEN status = 'new' THEN 1 END) AS new,
+            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) AS in_progress,
+            COUNT(CASE WHEN status = 'answered' THEN 1 END) AS answered,
+            COUNT(CASE WHEN status = 'closed' THEN 1 END) AS closed
        FROM support_tickets`,
   );
 
@@ -182,7 +180,7 @@ export async function getTicketCounts(): Promise<TicketCounts> {
 
 export async function getTicket(id: string): Promise<SupportTicketDto> {
   const db = await getDb();
-  const result = await db.query<TicketRow>('SELECT * FROM support_tickets WHERE id = $1', [id]);
+  const result = await db.query<TicketRow>('SELECT * FROM support_tickets WHERE id = ?', [id]);
   const row = result.rows[0];
 
   if (!row) throw new HttpError(404, 'Обращение не найдено');
@@ -209,20 +207,22 @@ export async function updateTicket(
   const db = await getDb();
   await db.query(
     `UPDATE support_tickets
-        SET status = $2,
-            admin_reply = $3,
-            replied_by = CASE WHEN $4 THEN $5 ELSE replied_by END,
-            replied_by_login = CASE WHEN $4 THEN $6 ELSE replied_by_login END,
-            replied_at = CASE WHEN $4 THEN NOW() ELSE replied_at END,
-            updated_at = NOW()
-      WHERE id = $1`,
+        SET status = ?,
+            admin_reply = ?,
+            replied_by = CASE WHEN ? THEN ? ELSE replied_by END,
+            replied_by_login = CASE WHEN ? THEN ? ELSE replied_by_login END,
+            replied_at = CASE WHEN ? THEN CURRENT_TIMESTAMP(3) ELSE replied_at END,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
     [
-      id,
       status,
       input.admin_reply !== undefined ? input.admin_reply || null : previous.admin_reply,
       hasReply,
       actor.sub,
+      hasReply,
       actor.login,
+      hasReply,
+      id,
     ],
   );
 

@@ -24,10 +24,11 @@ const GROUP_PREFIX: Record<AuditGroup, string> = {
   auth: 'auth.',
 };
 
-const PERIOD_INTERVAL: Record<Exclude<ListAuditQuery['period'], 'all'>, string> = {
-  '24h': '24 hours',
-  '7d': '7 days',
-  '30d': '30 days',
+/** Период в часах: подставляется в `INTERVAL n HOUR`. */
+const PERIOD_HOURS: Record<Exclude<ListAuditQuery['period'], 'all'>, number> = {
+  '24h': 24,
+  '7d': 24 * 7,
+  '30d': 24 * 30,
 };
 
 function parseDetails(value: unknown): Record<string, unknown> | null {
@@ -76,7 +77,7 @@ export async function recordAudit(req: Request, input: AuditRecordInput): Promis
     await db.query(
       `INSERT INTO audit_log
          (id, user_id, user_login, action, entity_type, entity_id, entity_label, details, ip, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         randomUUID(),
         input.actor.id,
@@ -115,32 +116,29 @@ export async function listAudit(query: ListAuditQuery): Promise<AuditListResult>
 
   if (query.group) {
     params.push(`${GROUP_PREFIX[query.group]}%`);
-    conditions.push(`action LIKE $${params.length}`);
+    conditions.push('action LIKE ?');
   }
 
   if (query.period !== 'all') {
-    conditions.push(`created_at >= NOW() - INTERVAL '${PERIOD_INTERVAL[query.period]}'`);
+    conditions.push(`created_at >= CURRENT_TIMESTAMP(3) - INTERVAL ${PERIOD_HOURS[query.period]} HOUR`);
   }
 
   if (query.user_id) {
     params.push(query.user_id);
-    conditions.push(`user_id = $${params.length}`);
+    conditions.push('user_id = ?');
   }
 
   if (query.search) {
-    params.push(`%${escapeLike(query.search)}%`);
-    const position = params.length;
+    const pattern = `%${escapeLike(query.search)}%`;
+    params.push(pattern, pattern);
     conditions.push(
-      `(entity_label ILIKE $${position} ESCAPE '!' OR user_login ILIKE $${position} ESCAPE '!')`,
+      "(entity_label LIKE ? ESCAPE '!' OR user_login LIKE ? ESCAPE '!')",
     );
   }
 
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  params.push(query.limit);
-  const limitPosition = params.length;
-  params.push(query.offset);
-  const offsetPosition = params.length;
+  params.push(query.limit, query.offset);
 
   const result = await db.query<AuditLogRow>(
     `SELECT id,
@@ -158,7 +156,7 @@ export async function listAudit(query: ListAuditQuery): Promise<AuditListResult>
        FROM audit_log
        ${whereSql}
       ORDER BY created_at DESC, id DESC
-      LIMIT $${limitPosition} OFFSET $${offsetPosition}`,
+      LIMIT ? OFFSET ?`,
     params,
   );
 

@@ -15,45 +15,58 @@ function toDto(row: CategoryRow): CategoryDto {
   };
 }
 
+const CATEGORY_SELECT = `
+  SELECT c.id,
+         c.name,
+         c.created_at,
+         c.updated_at,
+         (SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id) AS resource_count
+    FROM categories AS c
+`;
+
+async function findCategoryById(id: string): Promise<CategoryRow | null> {
+  const db = await getDb();
+  const result = await db.query<CategoryRow>(`${CATEGORY_SELECT} WHERE c.id = ?`, [id]);
+
+  return result.rows[0] ?? null;
+}
+
+async function assertNameIsFree(name: string, exceptId?: string): Promise<void> {
+  const db = await getDb();
+  const result = await db.query<{ id: string }>(
+    `SELECT id FROM categories WHERE name = ?${exceptId ? ' AND id <> ?' : ''}`,
+    exceptId ? [name, exceptId] : [name],
+  );
+
+  if (result.rows.length > 0) {
+    throw new HttpError(409, 'Категория с таким названием уже существует');
+  }
+}
+
 export async function listCategories(): Promise<CategoryDto[]> {
   const db = await getDb();
-  const result = await db.query<CategoryRow>(
-    `SELECT c.id,
-            c.name,
-            c.created_at,
-            c.updated_at,
-            COUNT(r.id)::int AS resource_count
-       FROM categories AS c
-       LEFT JOIN resources AS r ON r.category_id = c.id
-      GROUP BY c.id, c.name, c.created_at, c.updated_at
-      ORDER BY LOWER(c.name) ASC`,
-  );
+  const result = await db.query<CategoryRow>(`${CATEGORY_SELECT} ORDER BY c.name ASC`);
 
   return result.rows.map(toDto);
 }
 
 export async function createCategory(input: CategoryInput): Promise<CategoryDto> {
+  await assertNameIsFree(input.name);
+
   const db = await getDb();
+  const id = randomUUID();
 
-  const duplicate = await db.query<{ id: string }>(
-    'SELECT id FROM categories WHERE LOWER(name) = LOWER($1)',
-    [input.name],
-  );
-
-  if (duplicate.rows.length > 0) {
-    throw new HttpError(409, 'Категория с таким названием уже существует');
-  }
-
-  const result = await db.query<CategoryRow>(
-    `INSERT INTO categories (id, name)
-     VALUES ($1, $2)
-     RETURNING id, name, created_at, updated_at, 0::int AS resource_count`,
-    [randomUUID(), input.name],
-  );
+  await db.query('INSERT INTO categories (id, name) VALUES (?, ?)', [id, input.name]);
 
   invalidateResourceListCache();
 
-  return toDto(result.rows[0]!);
+  const created = await findCategoryById(id);
+
+  if (!created) {
+    throw new HttpError(500, 'Не удалось создать категорию');
+  }
+
+  return toDto(created);
 }
 
 export interface CategoryUpdateResult {
@@ -65,49 +78,31 @@ export async function updateCategory(
   id: string,
   input: CategoryInput,
 ): Promise<CategoryUpdateResult> {
-  const db = await getDb();
+  const current = await findCategoryById(id);
 
-  const current = await db.query<CategoryRow>(
-    `SELECT c.id,
-            c.name,
-            c.created_at,
-            c.updated_at,
-            COUNT(r.id)::int AS resource_count
-       FROM categories AS c
-       LEFT JOIN resources AS r ON r.category_id = c.id
-      WHERE c.id = $1
-      GROUP BY c.id, c.name, c.created_at, c.updated_at`,
-    [id],
-  );
-
-  if (!current.rows[0]) {
+  if (!current) {
     throw new HttpError(404, 'Категория не найдена');
   }
 
-  const previous = toDto(current.rows[0]);
+  const previous = toDto(current);
 
-  const duplicate = await db.query<{ id: string }>(
-    'SELECT id FROM categories WHERE LOWER(name) = LOWER($1) AND id <> $2',
-    [input.name, id],
-  );
+  await assertNameIsFree(input.name, id);
 
-  if (duplicate.rows.length > 0) {
-    throw new HttpError(409, 'Категория с таким названием уже существует');
-  }
-
-  const result = await db.query<CategoryRow>(
-    `UPDATE categories
-        SET name = $1,
-            updated_at = NOW()
-      WHERE id = $2
-      RETURNING id, name, created_at, updated_at,
-                (SELECT COUNT(*)::int FROM resources WHERE category_id = $2) AS resource_count`,
-    [input.name, id],
-  );
+  const db = await getDb();
+  await db.query('UPDATE categories SET name = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ?', [
+    input.name,
+    id,
+  ]);
 
   invalidateResourceListCache();
 
-  return { data: toDto(result.rows[0]!), previous };
+  const updated = await findCategoryById(id);
+
+  if (!updated) {
+    throw new HttpError(404, 'Категория не найдена');
+  }
+
+  return { data: toDto(updated), previous };
 }
 
 export interface DeleteCategoryResult {
@@ -121,26 +116,14 @@ export interface DeleteCategoryResult {
  * автоматически переходят в «Без категории» — данные не теряются.
  */
 export async function deleteCategory(id: string): Promise<DeleteCategoryResult> {
-  const db = await getDb();
+  const existing = await findCategoryById(id);
 
-  const existing = await db.query<{ name: string }>(
-    'SELECT name FROM categories WHERE id = $1',
-    [id],
-  );
-
-  if (!existing.rows[0]) {
+  if (!existing) {
     throw new HttpError(404, 'Категория не найдена');
   }
 
-  const affected = await db.query<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM resources WHERE category_id = $1',
-    [id],
-  );
-
-  const result = await db.query<{ id: string }>(
-    'DELETE FROM categories WHERE id = $1 RETURNING id',
-    [id],
-  );
+  const db = await getDb();
+  const result = await db.query('DELETE FROM categories WHERE id = ?', [id]);
 
   if (result.rowCount === 0) {
     throw new HttpError(404, 'Категория не найдена');
@@ -150,7 +133,7 @@ export async function deleteCategory(id: string): Promise<DeleteCategoryResult> 
 
   return {
     id,
-    name: existing.rows[0].name,
-    moved_resources: Number(affected.rows[0]?.count ?? 0),
+    name: existing.name,
+    moved_resources: Number(existing.resource_count ?? 0),
   };
 }

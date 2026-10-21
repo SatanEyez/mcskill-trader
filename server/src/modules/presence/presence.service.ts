@@ -38,8 +38,8 @@ export async function listOnlineAdmins(): Promise<OnlineAdminDto[]> {
       WHERE u.status = 'approved'
         AND u.is_system = FALSE
         AND u.last_seen_at IS NOT NULL
-        AND u.last_seen_at >= NOW() - INTERVAL '${PRESENCE_WINDOW_MINUTES} minutes'
-      ORDER BY p.priority DESC NULLS LAST, LOWER(u.login) ASC`,
+        AND u.last_seen_at >= CURRENT_TIMESTAMP(3) - INTERVAL ${PRESENCE_WINDOW_MINUTES} MINUTE
+      ORDER BY p.priority IS NULL, p.priority DESC, u.login ASC`,
   );
 
   return result.rows.map((row) => ({

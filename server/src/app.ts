@@ -56,7 +56,7 @@ export function createApp(): Express {
 
       res.json({
         status: 'ok',
-        database: env.DATABASE_URL ? 'postgresql' : 'pglite',
+        database: 'mysql',
         uptime: Math.round(process.uptime()),
         timestamp: new Date().toISOString(),
       });

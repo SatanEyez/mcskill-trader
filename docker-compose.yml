@@ -1,25 +1,27 @@
-# Опциональный PostgreSQL для McSkill Trader.
-# PGlite (по умолчанию) внешней БД не требует — этот файл нужен, только если
-# вы хотите запускать API на настоящем PostgreSQL: docker compose up -d
-# и DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mcskill_trader в server/.env
+# Опциональный MySQL для McSkill Trader.
+# Нужен, если MySQL не установлен локально: docker compose up -d
+# и параметры подключения в server/.env (MYSQL_HOST, MYSQL_PORT, MYSQL_USER,
+# MYSQL_PASSWORD, MYSQL_DATABASE).
 services:
-  postgres:
-    image: postgres:16-alpine
+  mysql:
+    image: mysql:8.4
     container_name: mcskill-trader-db
     restart: unless-stopped
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_0900_ai_ci']
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mcskill_trader
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mcskill_trader
+      MYSQL_USER: mcskill
+      MYSQL_PASSWORD: change-me
     ports:
-      - '5432:5432'
+      - '3306:3306'
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d mcskill_trader']
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -proot --silent']
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
 volumes:
-  pgdata:
+  mysqldata:

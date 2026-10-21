@@ -1,9 +1,18 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env } from '../../config/env.js';
 
-/** Каталог загруженных изображений. Лежит вне client/dist — переживает пересборку фронта. */
-export const UPLOADS_DIR = resolve(env.UPLOAD_DIR);
+/**
+ * Каталог загруженных изображений. Лежит вне client/dist — переживает пересборку фронта.
+ *
+ * Относительный UPLOAD_DIR считается от каталога `server`, а не от текущего
+ * каталога процесса: иначе `npm run dev` (cwd = server) и
+ * `npx tsx server/src/index.ts` (cwd = корень) писали бы в разные папки.
+ */
+const serverRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+export const UPLOADS_DIR = resolve(serverRoot, env.UPLOAD_DIR);
 export const UPLOADS_URL_PREFIX = '/uploads';
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 

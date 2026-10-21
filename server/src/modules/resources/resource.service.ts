@@ -22,7 +22,7 @@ import type {
 } from './resource.types.js';
 
 const SORT_SQL: Record<ResourceSort, string> = {
-  name_asc: 'LOWER(r.name) ASC',
+  name_asc: 'r.name ASC',
   price_asc: 'r.min_price ASC',
   price_desc: 'r.min_price DESC',
   newest: 'r.created_at DESC',
@@ -74,7 +74,7 @@ async function assertCategoryExists(categoryId: string | null): Promise<void> {
   if (categoryId === null) return;
 
   const db = await getDb();
-  const result = await db.query<{ id: string }>('SELECT id FROM categories WHERE id = $1', [
+  const result = await db.query<{ id: string }>('SELECT id FROM categories WHERE id = ?', [
     categoryId,
   ]);
 
@@ -93,21 +93,18 @@ export async function listResources(query: ListResourcesQuery): Promise<Resource
 
   if (query.search) {
     params.push(`%${escapeLike(query.search)}%`);
-    conditions.push(`r.name ILIKE $${params.length} ESCAPE '!'`);
+    conditions.push("r.name LIKE ? ESCAPE '!'");
   }
 
   if (query.category_id) {
     params.push(query.category_id);
-    conditions.push(`r.category_id = $${params.length}`);
+    conditions.push('r.category_id = ?');
   }
 
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const orderSql = SORT_SQL[query.sort] ?? SORT_SQL.name_asc;
 
-  params.push(query.limit);
-  const limitPosition = params.length;
-  params.push((query.page - 1) * query.limit);
-  const offsetPosition = params.length;
+  params.push(query.limit, (query.page - 1) * query.limit);
 
   const rows = await db.query<ResourceRow>(
     `SELECT r.id,
@@ -124,7 +121,7 @@ export async function listResources(query: ListResourcesQuery): Promise<Resource
        LEFT JOIN categories AS c ON c.id = r.category_id
        ${whereSql}
       ORDER BY ${orderSql}
-      LIMIT $${limitPosition} OFFSET $${offsetPosition}`,
+      LIMIT ? OFFSET ?`,
     params,
   );
 
@@ -152,9 +149,7 @@ export async function listCatalog(): Promise<ResourceDto[]> {
   if (cached) return cached;
 
   const db = await getDb();
-  const rows = await db.query<ResourceRow>(
-    `${RESOURCE_SELECT} ORDER BY LOWER(r.name) ASC`,
-  );
+  const rows = await db.query<ResourceRow>(`${RESOURCE_SELECT} ORDER BY r.name ASC`);
   const data = rows.rows.map(toDto);
 
   writeCatalogCache(data);
@@ -169,7 +164,7 @@ export async function getResourceStats(): Promise<ResourceStats> {
     min_price: string | number | null;
     avg_price: string | number | null;
   }>(
-    `SELECT COUNT(*)::int AS total,
+    `SELECT COUNT(*) AS total,
             MIN(min_price) AS min_price,
             AVG(min_price) AS avg_price
        FROM resources`,
@@ -185,12 +180,10 @@ export async function getResourceStats(): Promise<ResourceStats> {
   const categories = await db.query<{ id: string; name: string; count: number }>(
     `SELECT c.id,
             c.name,
-            COUNT(r.id)::int AS count
+            (SELECT COUNT(*) FROM resources AS r WHERE r.category_id = c.id) AS count
        FROM categories AS c
-       LEFT JOIN resources AS r ON r.category_id = c.id
-      GROUP BY c.id, c.name
-     HAVING COUNT(r.id) > 0
-      ORDER BY COUNT(r.id) DESC, LOWER(c.name) ASC`,
+      WHERE EXISTS (SELECT 1 FROM resources AS r WHERE r.category_id = c.id)
+      ORDER BY count DESC, c.name ASC`,
   );
 
   const row = totals.rows[0];
@@ -221,7 +214,7 @@ export async function getResourceStats(): Promise<ResourceStats> {
 
 export async function getResourceById(id: string): Promise<ResourceDto> {
   const db = await getDb();
-  const result = await db.query<ResourceRow>(`${RESOURCE_SELECT} WHERE r.id = $1`, [id]);
+  const result = await db.query<ResourceRow>(`${RESOURCE_SELECT} WHERE r.id = ?`, [id]);
   const row = result.rows[0];
 
   if (!row) {
@@ -235,12 +228,13 @@ export async function createResource(input: ResourceInput): Promise<ResourceDto>
   assertNameColor(input.name_color);
   await assertCategoryExists(input.category_id);
   const db = await getDb();
-  const result = await db.query<{ id: string }>(
+  const id = randomUUID();
+
+  await db.query(
     `INSERT INTO resources (id, name, name_color, min_price, image_url, category_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id`,
+     VALUES (?, ?, ?, ?, ?, ?)`,
     [
-      randomUUID(),
+      id,
       input.name,
       input.name_color,
       input.min_price,
@@ -251,7 +245,7 @@ export async function createResource(input: ResourceInput): Promise<ResourceDto>
 
   invalidateResourceListCache();
 
-  return getResourceById(result.rows[0]!.id);
+  return getResourceById(id);
 }
 
 export interface ResourceUpdateResult {
@@ -282,13 +276,13 @@ export async function updateResource(
   const db = await getDb();
   await db.query(
     `UPDATE resources
-        SET name = $1,
-            name_color = $2,
-            min_price = $3,
-            image_url = $4,
-            category_id = $5,
-            updated_at = NOW()
-      WHERE id = $6`,
+        SET name = ?,
+            name_color = ?,
+            min_price = ?,
+            image_url = ?,
+            category_id = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
     [next.name, next.name_color, next.min_price, next.image_url, next.category_id, id],
   );
 
@@ -300,10 +294,7 @@ export async function updateResource(
 export async function deleteResource(id: string): Promise<ResourceDto> {
   const current = await getResourceById(id);
   const db = await getDb();
-  const result = await db.query<{ id: string }>(
-    'DELETE FROM resources WHERE id = $1 RETURNING id',
-    [id],
-  );
+  const result = await db.query('DELETE FROM resources WHERE id = ?', [id]);
 
   if (result.rowCount === 0) {
     throw new HttpError(404, 'Ресурс не найден');

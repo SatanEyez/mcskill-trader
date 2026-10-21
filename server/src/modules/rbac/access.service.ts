@@ -39,7 +39,7 @@ interface RoleRow {
   name: string;
   description: string | null;
   permissions: unknown;
-  is_system: boolean;
+  is_system: boolean | number;
   user_count?: number | string;
   created_at: Date | string;
   updated_at: Date | string;
@@ -50,7 +50,7 @@ interface PrefixRow {
   name: string;
   color: string;
   priority: number | string;
-  is_system: boolean;
+  is_system: boolean | number;
   user_count?: number | string;
   created_at: Date | string;
   updated_at: Date | string;
@@ -63,7 +63,7 @@ function toRoleDto(row: RoleRow): RoleDto {
     name: row.name,
     description: row.description,
     permissions: normalizePermissions(row.permissions),
-    is_system: row.is_system,
+    is_system: Boolean(row.is_system),
     user_count: Number(row.user_count ?? 0),
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
@@ -76,7 +76,7 @@ function toPrefixDto(row: PrefixRow): PrefixDto {
     name: row.name,
     color: row.color,
     priority: Number(row.priority ?? 0),
-    is_system: row.is_system,
+    is_system: Boolean(row.is_system),
     user_count: Number(row.user_count ?? 0),
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
@@ -86,18 +86,24 @@ function toPrefixDto(row: PrefixRow): PrefixDto {
 const ROLE_SELECT = `
   SELECT r.id, r.code, r.name, r.description, r.permissions, r.is_system,
          r.created_at, r.updated_at,
-         COUNT(u.id)::int AS user_count
+         (SELECT COUNT(*) FROM admin_users AS u
+           WHERE u.role_id = r.id AND u.is_system = FALSE) AS user_count
     FROM admin_roles AS r
-    LEFT JOIN admin_users AS u ON u.role_id = r.id AND u.is_system = FALSE
-   GROUP BY r.id, r.code, r.name, r.description, r.permissions, r.is_system,
-            r.created_at, r.updated_at
+`;
+
+const PREFIX_SELECT = `
+  SELECT p.id, p.name, p.color, p.priority, p.is_system,
+         p.created_at, p.updated_at,
+         (SELECT COUNT(*) FROM admin_users AS u
+           WHERE u.prefix_id = p.id AND u.is_system = FALSE) AS user_count
+    FROM admin_prefixes AS p
 `;
 
 export async function listRoles(): Promise<RoleDto[]> {
   const db = await getDb();
   const result = await db.query<RoleRow>(
     `${ROLE_SELECT}
-     ORDER BY CASE WHEN r.code = 'owner' THEN 0 ELSE 1 END, r.is_system DESC, LOWER(r.name) ASC`,
+     ORDER BY CASE WHEN r.code = 'owner' THEN 0 ELSE 1 END, r.is_system DESC, r.name ASC`,
   );
 
   return result.rows.map(toRoleDto);
@@ -105,7 +111,7 @@ export async function listRoles(): Promise<RoleDto[]> {
 
 async function getRoleById(id: string): Promise<RoleDto> {
   const db = await getDb();
-  const result = await db.query<RoleRow>(`${ROLE_SELECT} HAVING r.id = $1`, [id]);
+  const result = await db.query<RoleRow>(`${ROLE_SELECT} WHERE r.id = ?`, [id]);
   const row = result.rows[0];
 
   if (!row) throw new HttpError(404, 'Роль не найдена');
@@ -118,7 +124,7 @@ export async function createRole(input: CreateRoleInput): Promise<RoleDto> {
   const code = input.code.trim().toLowerCase();
 
   const duplicate = await db.query<{ id: string }>(
-    'SELECT id FROM admin_roles WHERE LOWER(code) = $1 OR LOWER(name) = LOWER($2)',
+    'SELECT id FROM admin_roles WHERE code = ? OR name = ?',
     [code, input.name],
   );
 
@@ -129,7 +135,7 @@ export async function createRole(input: CreateRoleInput): Promise<RoleDto> {
   const id = randomUUID();
   await db.query(
     `INSERT INTO admin_roles (id, code, name, description, permissions, is_system)
-     VALUES ($1, $2, $3, $4, $5::jsonb, FALSE)`,
+     VALUES (?, ?, ?, ?, ?, FALSE)`,
     [
       id,
       code,
@@ -158,7 +164,7 @@ export async function updateRole(id: string, input: UpdateRoleInput): Promise<Ro
 
   if (input.name && input.name.toLowerCase() !== previous.name.toLowerCase()) {
     const duplicate = await db.query<{ id: string }>(
-      'SELECT id FROM admin_roles WHERE LOWER(name) = LOWER($1) AND id <> $2',
+      'SELECT id FROM admin_roles WHERE name = ? AND id <> ?',
       [input.name, id],
     );
 
@@ -169,18 +175,18 @@ export async function updateRole(id: string, input: UpdateRoleInput): Promise<Ro
 
   await db.query(
     `UPDATE admin_roles
-        SET name = $2,
-            description = $3,
-            permissions = $4::jsonb,
-            updated_at = NOW()
-      WHERE id = $1`,
+        SET name = ?,
+            description = ?,
+            permissions = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
     [
-      id,
       input.name ?? previous.name,
       input.description !== undefined ? input.description : previous.description,
       JSON.stringify(
         normalizePermissions(input.permissions ?? (previous.permissions as PermissionKey[])),
       ),
+      id,
     ],
   );
 
@@ -195,27 +201,18 @@ export async function deleteRole(id: string): Promise<RoleDto> {
   }
 
   const db = await getDb();
-  await db.query('DELETE FROM admin_roles WHERE id = $1', [id]);
+  await db.query('DELETE FROM admin_roles WHERE id = ?', [id]);
 
   return existing;
 }
 
 // ── Префиксы ─────────────────────────────────────────────────
 
-const PREFIX_SELECT = `
-  SELECT p.id, p.name, p.color, p.priority, p.is_system,
-         p.created_at, p.updated_at,
-         COUNT(u.id)::int AS user_count
-    FROM admin_prefixes AS p
-    LEFT JOIN admin_users AS u ON u.prefix_id = p.id AND u.is_system = FALSE
-   GROUP BY p.id, p.name, p.color, p.priority, p.is_system, p.created_at, p.updated_at
-`;
-
 export async function listPrefixes(): Promise<PrefixDto[]> {
   const db = await getDb();
   const result = await db.query<PrefixRow>(
     `${PREFIX_SELECT}
-     ORDER BY p.priority DESC, LOWER(p.name) ASC`,
+     ORDER BY p.priority DESC, p.name ASC`,
   );
 
   return result.rows.map(toPrefixDto);
@@ -223,7 +220,7 @@ export async function listPrefixes(): Promise<PrefixDto[]> {
 
 async function getPrefixById(id: string): Promise<PrefixDto> {
   const db = await getDb();
-  const result = await db.query<PrefixRow>(`${PREFIX_SELECT} HAVING p.id = $1`, [id]);
+  const result = await db.query<PrefixRow>(`${PREFIX_SELECT} WHERE p.id = ?`, [id]);
   const row = result.rows[0];
 
   if (!row) throw new HttpError(404, 'Префикс не найден');
@@ -234,7 +231,7 @@ async function getPrefixById(id: string): Promise<PrefixDto> {
 export async function createPrefix(input: CreatePrefixInput): Promise<PrefixDto> {
   const db = await getDb();
   const duplicate = await db.query<{ id: string }>(
-    'SELECT id FROM admin_prefixes WHERE LOWER(name) = LOWER($1)',
+    'SELECT id FROM admin_prefixes WHERE name = ?',
     [input.name],
   );
 
@@ -245,7 +242,7 @@ export async function createPrefix(input: CreatePrefixInput): Promise<PrefixDto>
   const id = randomUUID();
   await db.query(
     `INSERT INTO admin_prefixes (id, name, color, priority, is_system)
-     VALUES ($1, $2, $3, $4, FALSE)`,
+     VALUES (?, ?, ?, ?, FALSE)`,
     [id, input.name, input.color, input.priority],
   );
 
@@ -266,7 +263,7 @@ export async function updatePrefix(
 
   if (input.name && input.name.toLowerCase() !== previous.name.toLowerCase()) {
     const duplicate = await db.query<{ id: string }>(
-      'SELECT id FROM admin_prefixes WHERE LOWER(name) = LOWER($1) AND id <> $2',
+      'SELECT id FROM admin_prefixes WHERE name = ? AND id <> ?',
       [input.name, id],
     );
 
@@ -277,16 +274,16 @@ export async function updatePrefix(
 
   await db.query(
     `UPDATE admin_prefixes
-        SET name = $2,
-            color = $3,
-            priority = $4,
-            updated_at = NOW()
-      WHERE id = $1`,
+        SET name = ?,
+            color = ?,
+            priority = ?,
+            updated_at = CURRENT_TIMESTAMP(3)
+      WHERE id = ?`,
     [
-      id,
       input.name ?? previous.name,
       input.color ?? previous.color,
       input.priority ?? previous.priority,
+      id,
     ],
   );
 
@@ -301,7 +298,7 @@ export async function deletePrefix(id: string): Promise<PrefixDto> {
   }
 
   const db = await getDb();
-  await db.query('DELETE FROM admin_prefixes WHERE id = $1', [id]);
+  await db.query('DELETE FROM admin_prefixes WHERE id = ?', [id]);
 
   return existing;
 }

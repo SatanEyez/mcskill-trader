@@ -15,7 +15,7 @@ export interface SeedResult {
 export async function seedDatabase(force = false): Promise<SeedResult> {
   const db = await getDb();
 
-  const countResult = await db.query<{ count: number }>('SELECT COUNT(*)::int AS count FROM resources');
+  const countResult = await db.query<{ count: number }>('SELECT COUNT(*) AS count FROM resources');
   const existing = Number(countResult.rows[0]?.count ?? 0);
 
   if (existing > 0 && !force) {
@@ -23,29 +23,28 @@ export async function seedDatabase(force = false): Promise<SeedResult> {
   }
 
   if (force) {
-    await db.query('TRUNCATE TABLE resources, categories CASCADE');
+    // Порядок важен из-за внешнего ключа resources → categories.
+    await db.query('DELETE FROM resources');
+    await db.query('DELETE FROM categories');
   }
 
   const categoryIds = new Map<string, string>();
   const categoryNames = Array.from(new Set(seedResources.map((resource) => resource.category)));
 
   for (const name of categoryNames) {
-    const inserted = await db.query<{ id: string }>(
-      `INSERT INTO categories (id, name)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING
-       RETURNING id`,
-      [randomUUID(), name],
-    );
+    const id = randomUUID();
+    const inserted = await db.query('INSERT IGNORE INTO categories (id, name) VALUES (?, ?)', [
+      id,
+      name,
+    ]);
 
-    let categoryId = inserted.rows[0]?.id;
+    let categoryId: string | null = inserted.rowCount > 0 ? id : null;
 
     if (!categoryId) {
-      const found = await db.query<{ id: string }>(
-        'SELECT id FROM categories WHERE LOWER(name) = LOWER($1)',
-        [name],
-      );
-      categoryId = found.rows[0]?.id;
+      const found = await db.query<{ id: string }>('SELECT id FROM categories WHERE name = ?', [
+        name,
+      ]);
+      categoryId = found.rows[0]?.id ?? null;
     }
 
     if (!categoryId) {
@@ -57,9 +56,8 @@ export async function seedDatabase(force = false): Promise<SeedResult> {
 
   for (const resource of seedResources) {
     await db.query(
-      `INSERT INTO resources (id, name, min_price, image_url, category_id)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT DO NOTHING`,
+      `INSERT IGNORE INTO resources (id, name, min_price, image_url, category_id)
+       VALUES (?, ?, ?, ?, ?)`,
       [
         randomUUID(),
         resource.name,
