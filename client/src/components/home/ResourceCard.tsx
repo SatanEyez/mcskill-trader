@@ -29,7 +29,7 @@ export function ResourceCard({ resource, onUse }: ResourceCardProps) {
       />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.07] to-transparent p-1.5 transition group-hover:border-accent/20">
+        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-gradient-to-br from-white/[0.07] to-transparent p-2 transition group-hover:border-accent/20">
           <ItemImage src={resource.image_url} alt={resource.name} className="h-full w-full" />
         </span>
 

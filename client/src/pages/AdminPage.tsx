@@ -473,7 +473,7 @@ export function AdminPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
-                                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+                                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
                                   <ItemImage
                                     src={resource.image_url}
                                     alt={resource.name}
@@ -558,7 +558,7 @@ export function AdminPage() {
                           label={`Выбрать ${resource.name}`}
                           className="mt-1"
                         />
-                        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+                        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
                           <ItemImage
                             src={resource.image_url}
                             alt={resource.name}
@@ -672,7 +672,7 @@ export function AdminPage() {
                     <ul className="divide-y divide-white/[0.05]">
                       {excluded.map((item) => (
                         <li key={item.id} className="flex items-center gap-3 py-2.5">
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+                          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
                             <ItemImage src={item.image_url} alt={item.name} className="h-full w-full" />
                           </span>
 

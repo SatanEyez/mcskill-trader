@@ -104,7 +104,7 @@ function PreviewSide({
                   : 'translate-y-1.5 scale-95 border-transparent bg-transparent opacity-0',
               )}
             >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-white/[0.06] bg-void/60 p-0.5">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-void/60 p-1">
                 <img
                   src={item.icon}
                   alt=""

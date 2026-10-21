@@ -166,7 +166,7 @@ export function ItemPickerModal({
                           : 'Добавить предмет'
                     }
                   >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+                    <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
                       <ItemImage src={resource.image_url} alt="" className="h-full w-full" />
                     </span>
 

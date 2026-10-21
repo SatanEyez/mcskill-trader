@@ -69,7 +69,7 @@ export function DeleteResourceDialog({ resource, onClose, onDeleted }: DeleteRes
       {resource && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
               <ItemImage src={resource.image_url} alt={resource.name} className="h-full w-full" />
             </span>
             <div className="min-w-0">

@@ -519,7 +519,7 @@ export function ResourceFormModal({
                 key={form.imageUrl}
                 src={form.imageUrl}
                 alt={form.name || 'Предпросмотр предмета'}
-                className="h-14 w-14"
+                className="h-16 w-16"
                 eager
               />
               <span
