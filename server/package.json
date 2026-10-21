@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "db:seed": "tsx src/db/seed-cli.ts",
     "db:seed:force": "tsx src/db/seed-cli.ts --force",
+    "db:price-icons": "tsx src/db/price-icons-cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
