@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  ChevronDown,
   PackageSearch,
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
 } from 'lucide-react';
@@ -12,9 +14,11 @@ import clsx from 'clsx';
 import { useResourceFeed } from '../hooks/useResourceFeed';
 import { useResourceStats } from '../hooks/useResourceStats';
 import { useCategories } from '../hooks/useCategories';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import type { Resource } from '../types';
-import { formatDate, formatPrice } from '../lib/format';
+import type { ExcludedResource, Resource } from '../types';
+import { formatDate, formatDateTimeMsk, formatPrice } from '../lib/format';
+import { ApiError, fetchExcludedResources, restoreExcludedResource } from '../lib/api';
 import { readableNameColor } from '../lib/color';
 import { categoryStyle } from '../lib/constants';
 import { AdminHeader } from '../components/admin/AdminHeader';
@@ -23,7 +27,7 @@ import { AdminStats } from '../components/admin/AdminStats';
 import { ResourceFormModal } from '../components/admin/ResourceFormModal';
 import { DeleteResourceDialog } from '../components/admin/DeleteResourceDialog';
 import { ItemImage } from '../components/ui/ItemImage';
-import { PageLoader } from '../components/ui/Spinner';
+import { PageLoader, Spinner } from '../components/ui/Spinner';
 import { Pagination } from '../components/ui/Pagination';
 
 const PAGE_SIZE = 40;
@@ -32,6 +36,8 @@ export function AdminPage() {
   const { categories, reload: reloadCategories } = useCategories();
   const { stats, loading: statsLoading, reload: reloadStats } = useResourceStats();
   const { notify } = useToast();
+  const { can } = useAuth();
+  const canManageDeleted = can('resources.delete');
 
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -41,6 +47,11 @@ export function AdminPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [deletingResource, setDeletingResource] = useState<Resource | null>(null);
+
+  const [excluded, setExcluded] = useState<ExcludedResource[]>([]);
+  const [excludedOpen, setExcludedOpen] = useState(false);
+  const [excludedLoading, setExcludedLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const { resources, total, pages, loading, error, reload } = useResourceFeed({
     search,
@@ -69,6 +80,34 @@ export function AdminPage() {
 
   const hasFilters = searchInput.trim() !== '' || categoryId !== 'all';
 
+  const loadExcluded = useCallback(
+    async (silent = false) => {
+      if (!canManageDeleted) return;
+
+      if (!silent) setExcludedLoading(true);
+
+      try {
+        setExcluded(await fetchExcludedResources());
+      } catch (loadError) {
+        if (!silent) {
+          notify(
+            loadError instanceof ApiError
+              ? loadError.message
+              : 'Не удалось загрузить удалённые предметы',
+            'error',
+          );
+        }
+      } finally {
+        if (!silent) setExcludedLoading(false);
+      }
+    },
+    [canManageDeleted, notify],
+  );
+
+  useEffect(() => {
+    void loadExcluded(true);
+  }, [loadExcluded]);
+
   const openCreate = () => {
     setEditingResource(null);
     setFormOpen(true);
@@ -94,6 +133,31 @@ export function AdminPage() {
     void reload({ silent: true });
     void reloadStats();
     void reloadCategories({ silent: true });
+    void loadExcluded(true);
+  };
+
+  const handleRestore = async (item: ExcludedResource) => {
+    if (restoringId) return;
+
+    setRestoringId(item.id);
+
+    try {
+      await restoreExcludedResource(item.id);
+      notify(`«${item.name}» возвращён в каталог`, 'success');
+      void reload({ silent: true });
+      void reloadStats();
+      void reloadCategories({ silent: true });
+      await loadExcluded(true);
+    } catch (restoreError) {
+      notify(
+        restoreError instanceof ApiError
+          ? restoreError.message
+          : 'Не удалось вернуть предмет в каталог',
+        'error',
+      );
+    } finally {
+      setRestoringId(null);
+    }
   };
 
   const resetFilters = () => {
@@ -420,6 +484,95 @@ export function AdminPage() {
               чётче всего. Внешние ссылки на изображения тоже поддерживаются.
             </p>
           </>
+        )}
+
+        {canManageDeleted && (
+          <section className="panel mt-5 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setExcludedOpen((open) => !open)}
+              aria-expanded={excludedOpen}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/[0.02]"
+            >
+              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
+                <Trash2 className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                <span className="truncate">Удалённые предметы</span>
+                <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                  {excluded.length}
+                </span>
+              </span>
+              <ChevronDown
+                className={clsx(
+                  'h-4 w-4 shrink-0 text-slate-500 transition-transform',
+                  excludedOpen && 'rotate-180',
+                )}
+                aria-hidden
+              />
+            </button>
+
+            {excludedOpen && (
+              <div className="border-t border-white/[0.05] px-4 py-3">
+                {excludedLoading ? (
+                  <p className="flex items-center gap-2 py-3 text-xs text-slate-500">
+                    <Spinner className="h-4 w-4" />
+                    Загружаем список…
+                  </p>
+                ) : excluded.length === 0 ? (
+                  <p className="py-3 text-xs text-slate-500">
+                    Пока ничего не удаляли. Удалённый предмет попадёт сюда и не вернётся при
+                    следующем импорте прайса.
+                  </p>
+                ) : (
+                  <>
+                    <ul className="divide-y divide-white/[0.05]">
+                      {excluded.map((item) => (
+                        <li key={item.id} className="flex items-center gap-3 py-2.5">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-white/[0.03] p-1">
+                            <ItemImage src={item.image_url} alt={item.name} className="h-full w-full" />
+                          </span>
+
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className="block truncate text-sm font-medium text-white"
+                              style={{ color: readableNameColor(item.name_color) }}
+                              title={item.name}
+                            >
+                              {item.name}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[10px] text-slate-500">
+                              {item.category} · {formatPrice(item.min_price)} монет
+                              {item.created_by_login ? ` · удалил ${item.created_by_login}` : ''}
+                              {` · ${formatDateTimeMsk(item.created_at)}`}
+                            </span>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => void handleRestore(item)}
+                            disabled={restoringId === item.id}
+                            className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
+                            aria-label={`Вернуть ${item.name} в каталог`}
+                          >
+                            {restoringId === item.id ? (
+                              <Spinner className="h-3.5 w-3.5" />
+                            ) : (
+                              <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                            Вернуть
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <p className="mt-3 text-[11px] leading-relaxed text-slate-600">
+                      Пока предмет в этом списке, импорт прайса его пропускает. «Вернуть»
+                      добавляет его обратно в каталог с прежней ценой и иконкой.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
         )}
       </main>
 

@@ -3,6 +3,7 @@ import { getDb } from '../../db/index.js';
 import { toIso } from '../../utils/date.js';
 import { HttpError } from '../../utils/http-error.js';
 import { escapeLike } from '../../utils/sql.js';
+import type { AuthPayload } from '../auth/auth.tokens.js';
 import {
   invalidateResourceListCache,
   readCatalogCache,
@@ -291,16 +292,166 @@ export async function updateResource(
   return { data: await getResourceById(id), previous: current };
 }
 
-export async function deleteResource(id: string): Promise<ResourceDto> {
+export async function deleteResource(id: string, actor?: AuthPayload): Promise<ResourceDto> {
   const current = await getResourceById(id);
   const db = await getDb();
-  const result = await db.query('DELETE FROM resources WHERE id = ?', [id]);
 
-  if (result.rowCount === 0) {
-    throw new HttpError(404, 'Ресурс не найден');
-  }
+  await db.transaction(async (tx) => {
+    const keyRow = await tx.query<{ source_key: string | null }>(
+      'SELECT source_key FROM resources WHERE id = ?',
+      [id],
+    );
+    const result = await tx.query('DELETE FROM resources WHERE id = ?', [id]);
+
+    if (result.rowCount === 0) {
+      throw new HttpError(404, 'Ресурс не найден');
+    }
+
+    // Стоп-лист: следующий импорт не вернёт предмет обратно. Данные храним,
+    // чтобы его можно было восстановить одной кнопкой.
+    await tx.query(
+      `INSERT INTO import_exclusions
+         (id, source_key, name_key, name, min_price, image_url, name_color, category_id,
+          created_by, created_by_login)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         name_key = VALUES(name_key),
+         name = VALUES(name),
+         min_price = VALUES(min_price),
+         image_url = VALUES(image_url),
+         name_color = VALUES(name_color),
+         category_id = VALUES(category_id),
+         created_by = VALUES(created_by),
+         created_by_login = VALUES(created_by_login),
+         created_at = CURRENT_TIMESTAMP(3)`,
+      [
+        randomUUID(),
+        keyRow.rows[0]?.source_key ?? null,
+        current.name.toLowerCase(),
+        current.name,
+        current.min_price,
+        current.image_url,
+        current.name_color,
+        current.category_id,
+        actor?.sub ?? null,
+        actor?.login ?? null,
+      ],
+    );
+  });
 
   invalidateResourceListCache();
 
   return current;
+}
+
+export interface ExcludedResourceDto {
+  id: string;
+  name: string;
+  min_price: number;
+  image_url: string;
+  name_color: string | null;
+  category: string;
+  created_by_login: string | null;
+  created_at: string;
+}
+
+interface ExclusionRow {
+  id: string;
+  source_key: string | null;
+  name_key: string;
+  name: string;
+  min_price: string | number;
+  image_url: string;
+  name_color: string | null;
+  category_id: string | null;
+  created_by: string | null;
+  created_by_login: string | null;
+  created_at: Date | string;
+  category_name: string | null;
+}
+
+/** Удалённые предметы: импорт их пропускает, пока запись не убрать. */
+export async function listExcludedResources(): Promise<ExcludedResourceDto[]> {
+  const db = await getDb();
+  const result = await db.query<ExclusionRow>(
+    `SELECT e.id,
+            e.source_key,
+            e.name_key,
+            e.name,
+            e.min_price,
+            e.image_url,
+            e.name_color,
+            e.category_id,
+            e.created_by,
+            e.created_by_login,
+            e.created_at,
+            c.name AS category_name
+       FROM import_exclusions AS e
+       LEFT JOIN categories AS c ON c.id = e.category_id
+      ORDER BY e.created_at DESC
+      LIMIT 500`,
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    min_price: Number(row.min_price),
+    image_url: row.image_url,
+    name_color: row.name_color,
+    category: row.category_name ?? 'Без категории',
+    created_by_login: row.created_by_login,
+    created_at: toIso(row.created_at),
+  }));
+}
+
+export async function restoreExcludedResource(id: string): Promise<ResourceDto> {
+  const db = await getDb();
+  const found = await db.query<ExclusionRow>(
+    `SELECT e.*, c.name AS category_name
+       FROM import_exclusions AS e
+       LEFT JOIN categories AS c ON c.id = e.category_id
+      WHERE e.id = ?`,
+    [id],
+  );
+  const row = found.rows[0];
+
+  if (!row) {
+    throw new HttpError(404, 'Удалённый предмет не найден');
+  }
+
+  const resourceId = randomUUID();
+
+  await db.transaction(async (tx) => {
+    if (row.source_key) {
+      const clash = await tx.query<{ id: string }>(
+        'SELECT id FROM resources WHERE source_key = ?',
+        [row.source_key],
+      );
+
+      if (clash.rows.length > 0) {
+        throw new HttpError(409, 'Предмет уже есть в каталоге');
+      }
+    }
+
+    await tx.query(
+      `INSERT INTO resources
+         (id, name, name_color, min_price, image_url, category_id, source_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        resourceId,
+        row.name,
+        row.name_color,
+        row.min_price,
+        row.image_url,
+        row.category_id,
+        row.source_key,
+      ],
+    );
+
+    await tx.query('DELETE FROM import_exclusions WHERE id = ?', [id]);
+  });
+
+  invalidateResourceListCache();
+
+  return getResourceById(resourceId);
 }

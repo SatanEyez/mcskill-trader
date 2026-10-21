@@ -92,6 +92,35 @@ export function createApp(): Express {
     }),
   );
 
+  // Иконки, загруженные импортом, лежат в базе: на Render диск эфемерный.
+  app.get(
+    `${UPLOADS_URL_PREFIX}/prices/:file`,
+    asyncHandler(async (req, res) => {
+      const name = req.params.file ?? '';
+
+      if (!/^\d{5}\.png$/.test(name)) {
+        res.status(404).json({ error: { message: 'Файл не найден' } });
+        return;
+      }
+
+      const db = await getDb();
+      const result = await db.query<{ data: Buffer }>(
+        'SELECT data FROM price_icons WHERE name = ?',
+        [name],
+      );
+      const row = result.rows[0];
+
+      if (!row) {
+        res.status(404).json({ error: { message: 'Файл не найден' } });
+        return;
+      }
+
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(row.data);
+    }),
+  );
+
   app.get(
     `${UPLOADS_URL_PREFIX}/:file`,
     asyncHandler(async (req, res) => {

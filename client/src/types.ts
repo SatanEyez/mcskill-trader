@@ -12,6 +12,20 @@ export interface Resource {
   updated_at: string;
 }
 
+/** Удалённый предмет из стоп-листа импорта: пока он тут, импорт его не вернёт. */
+export interface ExcludedResource {
+  id: string;
+  name: string;
+  min_price: number;
+  image_url: string;
+  name_color: string | null;
+  /** Название категории для отображения. */
+  category: string;
+  /** Логин того, кто удалил предмет. */
+  created_by_login: string | null;
+  created_at: string;
+}
+
 export interface ResourceInput {
   name: string;
   name_color: string | null;

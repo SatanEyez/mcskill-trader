@@ -123,7 +123,7 @@ export const updateResource: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const deleteResource: RequestHandler = asyncHandler(async (req, res) => {
-  const deleted = await resourceService.deleteResource(getId(req));
+  const deleted = await resourceService.deleteResource(getId(req), req.auth!);
 
   await logAction(req, {
     action: 'resource.delete',
@@ -138,4 +138,27 @@ export const deleteResource: RequestHandler = asyncHandler(async (req, res) => {
   });
 
   res.json({ data: { id: deleted.id } });
+});
+
+export const listExcludedResources: RequestHandler = asyncHandler(async (_req, res) => {
+  res.json({ data: await resourceService.listExcludedResources() });
+});
+
+export const restoreExcludedResource: RequestHandler = asyncHandler(async (req, res) => {
+  const data = await resourceService.restoreExcludedResource(
+    requireUuid(req.params.id as string, 'идентификатор удалённого предмета'),
+  );
+
+  await logAction(req, {
+    action: 'resource.restore',
+    entityType: 'resource',
+    entityId: data.id,
+    entityLabel: data.name,
+    details: {
+      min_price: data.min_price,
+      category: data.category,
+    },
+  });
+
+  res.json({ data });
 });

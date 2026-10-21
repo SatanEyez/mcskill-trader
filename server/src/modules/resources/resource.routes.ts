@@ -8,7 +8,9 @@ import {
   getCatalog,
   getResource,
   getStats,
+  listExcludedResources,
   listResources,
+  restoreExcludedResource,
   updateResource,
 } from './resource.controller.js';
 import {
@@ -23,6 +25,19 @@ export const resourceRouter = Router();
 resourceRouter.get('/', validate(listResourcesQuerySchema, 'query'), listResources);
 resourceRouter.get('/catalog', getCatalog);
 resourceRouter.get('/stats', getStats);
+// Стоп-лист импорта — строго до /:id, иначе «exclusions» попадёт в getId.
+resourceRouter.get(
+  '/exclusions',
+  requireAdmin,
+  requirePermission('resources.delete'),
+  listExcludedResources,
+);
+resourceRouter.post(
+  '/exclusions/:id/restore',
+  requireAdmin,
+  requirePermission('resources.delete'),
+  restoreExcludedResource,
+);
 resourceRouter.get('/:id', getResource);
 
 // Маршруты только для администратора

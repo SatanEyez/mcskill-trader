@@ -11,6 +11,7 @@ import type {
   AuditLogMeta,
   AuditPeriod,
   Category,
+  ExcludedResource,
   ImportJob,
   ImportSummary,
   LoginResponse,
@@ -361,6 +362,22 @@ export async function deleteResource(id: string): Promise<void> {
     method: 'DELETE',
     auth: true,
   });
+}
+
+/** Удалённые предметы: импорт прайса их пропускает, пока запись не убрать. */
+export async function fetchExcludedResources(): Promise<ExcludedResource[]> {
+  const response = await request<{ data: ExcludedResource[] }>('/resources/exclusions', {
+    auth: true,
+  });
+  return response.data;
+}
+
+export async function restoreExcludedResource(id: string): Promise<Resource> {
+  const response = await request<{ data: Resource }>(
+    `/resources/exclusions/${encodeURIComponent(id)}/restore`,
+    { method: 'POST', auth: true },
+  );
+  return response.data;
 }
 
 export async function login(login: string, password: string): Promise<LoginResponse> {

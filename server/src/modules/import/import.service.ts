@@ -13,6 +13,8 @@ import { cropPng, decodePng } from './png.js';
 const ICON_SIZE = 32;
 const PRICE_ICON_DIR = join(UPLOADS_DIR, 'prices');
 const PRICE_ICON_URL = `${UPLOADS_URL_PREFIX}/prices`;
+/** Сколько иконок кладём в базу одним INSERT. */
+const ICON_BATCH_SIZE = 200;
 
 export interface ImportItem {
   modid?: unknown;
@@ -311,6 +313,21 @@ export async function runPriceImport(
   let skipped = 0;
   let images = 0;
 
+  const iconRows: Array<[string, Buffer]> = [];
+
+  /** Иконки пачками: 9 252 отдельных INSERT к TiDB растянули бы импорт на час. */
+  const flushIcons = async (): Promise<void> => {
+    if (iconRows.length === 0) return;
+
+    await db.query(
+      `INSERT INTO price_icons (name, data) VALUES ?
+         ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+      [iconRows],
+    );
+
+    iconRows.length = 0;
+  };
+
   try {
     let payload: unknown;
 
@@ -368,6 +385,17 @@ export async function runPriceImport(
       }
     }
 
+    // Стоп-лист: удалённое через админку не возвращаем.
+    const excluded = await db.query<{ source_key: string | null; name_key: string }>(
+      'SELECT source_key, name_key FROM import_exclusions',
+    );
+    const excludedSources = new Set(
+      excluded.rows
+        .map((row) => row.source_key)
+        .filter((key): key is string => Boolean(key)),
+    );
+    const excludedNames = new Set(excluded.rows.map((row) => row.name_key));
+
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index]!;
       const name = itemName(item);
@@ -385,6 +413,14 @@ export async function runPriceImport(
         continue;
       }
 
+      const sourceKey = itemSourceKey(item, index);
+      const nameKey = name.toLowerCase();
+
+      if (excludedSources.has(sourceKey) || excludedNames.has(nameKey)) {
+        skipped += 1;
+        continue;
+      }
+
       const spriteIndex = iconIndexByItem.get(item) ?? index;
       const column = spriteIndex % columns;
       const row = Math.floor(spriteIndex / columns);
@@ -398,6 +434,12 @@ export async function runPriceImport(
       );
 
       await writeFile(join(PRICE_ICON_DIR, iconName), iconBuffer);
+      iconRows.push([iconName, iconBuffer]);
+
+      if (iconRows.length >= ICON_BATCH_SIZE) {
+        await flushIcons();
+      }
+
       images += 1;
 
       const categoryId = await nextCategoryId(db, categoryCache, modName(item));
@@ -406,8 +448,6 @@ export async function runPriceImport(
       // Колонка resources.min_price — NUMERIC(18,2) с CHECK > 0.
       // Цены из прайса бывают меньше копейки, поэтому минимально допустимая — 0.01.
       const storedPrice = Math.max(0.01, Math.round(price * 100) / 100);
-      const sourceKey = itemSourceKey(item, index);
-      const nameKey = name.toLowerCase();
       const existingId =
         existingBySource.get(sourceKey) ?? existingByName.get(nameKey);
 
@@ -444,6 +484,8 @@ export async function runPriceImport(
         created += 1;
       }
     }
+
+    await flushIcons();
 
     await db.query(
       `UPDATE import_jobs
