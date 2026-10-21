@@ -27,7 +27,7 @@ export const createRole: RequestHandler = asyncHandler(async (req, res) => {
     entityType: 'role',
     entityId: data.id,
     entityLabel: data.name,
-    details: { code: data.code, permissions: data.permissions },
+    details: { code: data.code, permissions: data.permissions, access_level: data.access_level },
   });
 
   res.status(201).json({ data });
@@ -47,6 +47,7 @@ export const updateRole: RequestHandler = asyncHandler(async (req, res) => {
     details: {
       name: { from: previous.name, to: data.name },
       permissions: { from: previous.permissions, to: data.permissions },
+      access_level: { from: previous.access_level, to: data.access_level },
     },
   });
 

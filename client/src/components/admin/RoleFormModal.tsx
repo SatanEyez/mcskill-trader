@@ -19,6 +19,7 @@ interface FormState {
   name: string;
   description: string;
   permissions: string[];
+  access_level: number;
 }
 
 export function RoleFormModal({
@@ -33,6 +34,7 @@ export function RoleFormModal({
     name: '',
     description: '',
     permissions: [],
+    access_level: 10,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function RoleFormModal({
       name: role?.name ?? '',
       description: role?.description ?? '',
       permissions: role?.permissions.filter((permission) => permission !== '*') ?? [],
+      access_level: role?.access_level ?? 10,
     });
     setError(null);
   }, [open, role]);
@@ -83,6 +86,7 @@ export function RoleFormModal({
           name: form.name.trim(),
           description: form.description.trim() || null,
           permissions: form.permissions,
+          access_level: form.access_level,
         });
         onSaved(`Роль «${form.name.trim()}» обновлена`);
       } else {
@@ -91,6 +95,7 @@ export function RoleFormModal({
           name: form.name.trim(),
           description: form.description.trim() || null,
           permissions: form.permissions,
+          access_level: form.access_level,
         });
         onSaved(`Роль «${form.name.trim()}» создана`);
       }
@@ -182,6 +187,51 @@ export function RoleFormModal({
             disabled={isOwner}
           />
         </label>
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="field-label mb-0">Уровень доступа</span>
+            <span className="font-mono text-[11px] text-accent">{form.access_level}</span>
+          </div>
+
+          <div className="mt-2 flex items-center gap-3">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={form.access_level}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, access_level: Number(event.target.value) }))
+              }
+              disabled={isOwner}
+              aria-label="Уровень доступа роли"
+              className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-[#34d399] disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={form.access_level}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                setForm((current) => ({
+                  ...current,
+                  access_level: Number.isFinite(next) ? Math.min(100, Math.max(0, next)) : 0,
+                }));
+              }}
+              disabled={isOwner}
+              className="field w-20 py-1.5 text-center text-sm"
+              aria-label="Уровень доступа числом"
+            />
+          </div>
+
+          <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+            Чем выше уровень, тем больше разделов открыто. Ориентиры: 10 — базовый, 20 — стажёр,
+            40 — поддержка, 60 — модератор, 80 — администратор, 100 — владелец. Карточки в
+            «Панели управления» показывают, с какого уровня открывается каждый раздел.
+          </p>
+        </div>
 
         <div>
           <div className="flex items-center justify-between gap-2">

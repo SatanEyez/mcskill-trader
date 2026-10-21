@@ -25,12 +25,20 @@ const roleNameField = z
 
 const roleDescriptionField = z.string().trim().max(500, 'Слишком длинное описание').nullable();
 
+/** Уровень доступа: 0 — только вход в админку, 100 — владелец. */
+const accessLevelField = z.coerce
+  .number()
+  .int('Уровень должен быть целым числом')
+  .min(0, 'Минимальный уровень — 0')
+  .max(100, 'Максимальный уровень — 100');
+
 export const createRoleSchema = z
   .object({
     code: roleCodeField,
     name: roleNameField,
     description: roleDescriptionField.optional().default(null),
     permissions: permissionField,
+    access_level: accessLevelField.optional().default(10),
   })
   .strict();
 
@@ -39,6 +47,7 @@ export const updateRoleSchema = z
     name: roleNameField.optional(),
     description: roleDescriptionField.optional(),
     permissions: permissionField.optional(),
+    access_level: accessLevelField.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

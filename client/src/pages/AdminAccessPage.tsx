@@ -194,6 +194,12 @@ export function AdminAccessPage() {
                           <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] text-slate-500">
                             {role.code}
                           </span>
+                          <span
+                            className="rounded-full border border-accent/25 bg-accent/[0.09] px-2 py-0.5 text-[9px] font-semibold text-accent"
+                            title="Уровень доступа роли — с него открываются разделы в «Панели управления»"
+                          >
+                            ур. {role.access_level}
+                          </span>
                           {role.is_system && (
                             <span className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.07] px-2 py-0.5 text-[9px] uppercase tracking-wider text-cyan-300">
                               системная

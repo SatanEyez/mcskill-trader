@@ -94,7 +94,9 @@ export function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/admin';
+  // По умолчанию ведём в «Панель управления»: она открыта любому администратору,
+  // а конкретные разделы могут быть закрыты для его роли.
+  const from = (location.state as { from?: string } | null)?.from ?? '/admin/panel';
 
   if (status === 'authenticated') {
     return <Navigate to={from} replace />;

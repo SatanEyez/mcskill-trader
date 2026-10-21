@@ -277,6 +277,8 @@ export interface AdminRoleInfo {
   name: string;
   description: string | null;
   permissions: string[];
+  /** Уровень доступа роли: чем выше, тем больше разделов открыто. */
+  access_level: number;
   is_system: boolean;
   user_count: number;
   created_at: string;

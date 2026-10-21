@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { LayoutGrid } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { HomePage } from './pages/HomePage';
@@ -17,6 +18,7 @@ import { AdminAccessPage } from './pages/AdminAccessPage';
 import { AdminSupportPage } from './pages/AdminSupportPage';
 import { AdminImportPage } from './pages/AdminImportPage';
 import { AdminProfilePage } from './pages/AdminProfilePage';
+import { AdminPanelPage } from './pages/AdminPanelPage';
 import { AdminNewsPage } from './pages/AdminNewsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -122,6 +124,10 @@ function RequirePermission({
               Ваша роль не включает доступ к этому разделу. Попросите владельца выдать
               подходящую роль в разделе «Доступ».
             </p>
+            <Link to="/admin/panel" className="btn btn-secondary mt-5 px-3.5 py-2 text-xs">
+              <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
+              В панель управления
+            </Link>
           </div>
         </main>
       </div>
@@ -152,6 +158,14 @@ export function App() {
                   <RequirePermission permission="resources.read">
                     <AdminPage />
                   </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/panel"
+              element={
+                <RequireAdmin>
+                  <AdminPanelPage />
                 </RequireAdmin>
               }
             />

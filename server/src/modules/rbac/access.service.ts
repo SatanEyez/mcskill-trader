@@ -16,6 +16,8 @@ export interface RoleDto {
   name: string;
   description: string | null;
   permissions: string[];
+  /** Уровень доступа роли: чем выше, тем больше разделов открыто. */
+  access_level: number;
   is_system: boolean;
   user_count: number;
   created_at: string;
@@ -39,6 +41,7 @@ interface RoleRow {
   name: string;
   description: string | null;
   permissions: unknown;
+  access_level: number | string;
   is_system: boolean | number;
   user_count?: number | string;
   created_at: Date | string;
@@ -63,6 +66,7 @@ function toRoleDto(row: RoleRow): RoleDto {
     name: row.name,
     description: row.description,
     permissions: normalizePermissions(row.permissions),
+    access_level: Number(row.access_level ?? 0),
     is_system: Boolean(row.is_system),
     user_count: Number(row.user_count ?? 0),
     created_at: toIso(row.created_at),
@@ -85,7 +89,7 @@ function toPrefixDto(row: PrefixRow): PrefixDto {
 
 const ROLE_SELECT = `
   SELECT r.id, r.code, r.name, r.description, r.permissions, r.is_system,
-         r.created_at, r.updated_at,
+         r.access_level, r.created_at, r.updated_at,
          (SELECT COUNT(*) FROM admin_users AS u
            WHERE u.role_id = r.id AND u.is_system = FALSE) AS user_count
     FROM admin_roles AS r
@@ -134,14 +138,15 @@ export async function createRole(input: CreateRoleInput): Promise<RoleDto> {
 
   const id = randomUUID();
   await db.query(
-    `INSERT INTO admin_roles (id, code, name, description, permissions, is_system)
-     VALUES (?, ?, ?, ?, ?, FALSE)`,
+    `INSERT INTO admin_roles (id, code, name, description, permissions, access_level, is_system)
+     VALUES (?, ?, ?, ?, ?, ?, FALSE)`,
     [
       id,
       code,
       input.name,
       input.description,
       JSON.stringify(normalizePermissions(input.permissions)),
+      input.access_level,
     ],
   );
 
@@ -178,6 +183,7 @@ export async function updateRole(id: string, input: UpdateRoleInput): Promise<Ro
         SET name = ?,
             description = ?,
             permissions = ?,
+            access_level = ?,
             updated_at = CURRENT_TIMESTAMP(3)
       WHERE id = ?`,
     [
@@ -186,6 +192,7 @@ export async function updateRole(id: string, input: UpdateRoleInput): Promise<Ro
       JSON.stringify(
         normalizePermissions(input.permissions ?? (previous.permissions as PermissionKey[])),
       ),
+      input.access_level ?? previous.access_level,
       id,
     ],
   );

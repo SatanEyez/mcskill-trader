@@ -511,6 +511,7 @@ export async function createRole(input: {
   name: string;
   description: string | null;
   permissions: string[];
+  access_level?: number;
 }): Promise<AdminRoleInfo> {
   const response = await request<{ data: AdminRoleInfo }>('/roles', {
     method: 'POST',
@@ -522,7 +523,12 @@ export async function createRole(input: {
 
 export async function updateRole(
   id: string,
-  input: { name?: string; description?: string | null; permissions?: string[] },
+  input: {
+    name?: string;
+    description?: string | null;
+    permissions?: string[];
+    access_level?: number;
+  },
 ): Promise<AdminRoleInfo> {
   const response = await request<{ data: AdminRoleInfo }>(`/roles/${encodeURIComponent(id)}`, {
     method: 'PUT',
