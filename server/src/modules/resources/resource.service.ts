@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb, type Database } from '../../db/index.js';
 import { toIso } from '../../utils/date.js';
 import { HttpError } from '../../utils/http-error.js';
-import { escapeLike } from '../../utils/sql.js';
+import { escapeLike, normalizeSearch } from '../../utils/sql.js';
 import type { AuthPayload } from '../auth/auth.tokens.js';
 import {
   invalidateResourceListCache,
@@ -188,8 +188,10 @@ export async function listResources(query: ListResourcesQuery): Promise<Resource
   const params: unknown[] = [];
 
   if (query.search) {
-    params.push(`%${escapeLike(query.search)}%`);
-    conditions.push("r.name LIKE ? ESCAPE '!'");
+    params.push(`%${escapeLike(normalizeSearch(query.search))}%`);
+    conditions.push(
+      "LOWER(REPLACE(REPLACE(r.name, '-', ''), ' ', '')) LIKE ? ESCAPE '!'",
+    );
   }
 
   if (query.category_id) {

@@ -137,3 +137,11 @@ export function formatDateTimeMsk(isoDate: string | null | undefined): string {
   const date = parse(isoDate);
   return date ? `${mskDateTimeFormatter.format(date)} МСК` : '—';
 }
+
+/**
+ * Нормализует строку для «мягкого» поиска: убирает дефисы, пробелы и
+ * приводит к нижнему регистру. «мета-материя» и «мета материя» → «метаматерия».
+ */
+export function normalizeSearch(value: string): string {
+  return value.toLowerCase().replace(/[-\s]/g, '');
+}
