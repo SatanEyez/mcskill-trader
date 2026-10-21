@@ -209,11 +209,11 @@ export function AdminStatsPage() {
                     {series.map((point) => (
                       <div
                         key={point.bucket}
-                        className="group flex h-full flex-1 items-end"
+                        className="group flex h-full flex-1 items-end justify-center"
                         title={`${bucketLabel(point.bucket)} — ${point.visits} просмотров, ${point.visitors} посетителей`}
                       >
                         <div
-                          className="w-full rounded-t bg-accent/40 transition group-hover:bg-accent/70"
+                          className="w-full max-w-10 rounded-t bg-accent/40 transition group-hover:bg-accent/70"
                           style={{ height: `${Math.max(3, Math.round((point.visits / maxVisits) * 100))}%` }}
                         />
                       </div>

@@ -11,7 +11,7 @@ export function NewsBlock() {
   if (loading || posts.length === 0) return null;
 
   return (
-    <section id="news" className="container-page mt-10 scroll-mt-24">
+    <section id="news" className="container-page mt-10 mb-10 scroll-mt-24">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">

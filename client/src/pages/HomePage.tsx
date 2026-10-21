@@ -122,6 +122,8 @@ export function HomePage() {
           loading={statsLoading}
         />
 
+        <NewsBlock />
+
         <div className="container-page">
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
             <section id="resources" className="order-2 min-w-0 scroll-mt-24 xl:order-1">
@@ -198,8 +200,6 @@ export function HomePage() {
             </aside>
           </div>
         </div>
-
-        <NewsBlock />
       </main>
 
       <Footer />
