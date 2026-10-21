@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   { key: 'roles.manage', group: 'Доступ', label: 'Управление ролями и правами' },
   { key: 'prefixes.manage', group: 'Доступ', label: 'Управление префиксами' },
   { key: 'import.run', group: 'Импорт', label: 'Массовый импорт прайса' },
+  { key: 'news.write', group: 'Новости', label: 'Публикация новостей' },
+  { key: 'stats.view', group: 'Панель', label: 'Статистика посещений' },
   { key: 'logs.read', group: 'Журнал', label: 'Просмотр журнала действий' },
   { key: 'support.read', group: 'Обращения', label: 'Просмотр обращений' },
   { key: 'support.write', group: 'Обращения', label: 'Ответы на обращения' },

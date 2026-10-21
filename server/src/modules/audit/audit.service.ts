@@ -21,6 +21,7 @@ const GROUP_PREFIX: Record<AuditGroup, string> = {
   access: 'access.',
   import: 'import.',
   support: 'support.',
+  news: 'news.',
   auth: 'auth.',
 };
 

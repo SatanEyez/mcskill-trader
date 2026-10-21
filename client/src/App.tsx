@@ -1,10 +1,12 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { HomePage } from './pages/HomePage';
 import { TradePage } from './pages/TradePage';
 import { ReportPage } from './pages/ReportPage';
+import { NewsPage } from './pages/NewsPage';
+import { NewsPostPage } from './pages/NewsPostPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminPage } from './pages/AdminPage';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
@@ -14,10 +16,13 @@ import { AdminAccessPage } from './pages/AdminAccessPage';
 import { AdminSupportPage } from './pages/AdminSupportPage';
 import { AdminImportPage } from './pages/AdminImportPage';
 import { AdminProfilePage } from './pages/AdminProfilePage';
+import { AdminNewsPage } from './pages/AdminNewsPage';
+import { AdminStatsPage } from './pages/AdminStatsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminHeader } from './components/admin/AdminHeader';
 import { AdminTabs } from './components/admin/AdminTabs';
 import { PageLoader } from './components/ui/Spinner';
+import { trackVisit } from './lib/api';
 
 function ScrollToTopOnNavigate() {
   const location = useLocation();
@@ -27,6 +32,29 @@ function ScrollToTopOnNavigate() {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
   }, [location.pathname, location.hash]);
+
+  return null;
+}
+
+/**
+ * Отправляет просмотр страницы в статистику.
+ * Админку не считаем: это владельцы, а не посетители сайта.
+ */
+function VisitTracker() {
+  const location = useLocation();
+  const lastTracked = useRef('');
+
+  useEffect(() => {
+    const path = `${location.pathname}${location.search}`;
+
+    if (path.startsWith('/admin')) return;
+    if (lastTracked.current === path) return;
+
+    const referrer = lastTracked.current || document.referrer;
+    lastTracked.current = path;
+
+    void trackVisit(path, referrer);
+  }, [location.pathname, location.search]);
 
   return null;
 }
@@ -108,10 +136,13 @@ export function App() {
       <AuthProvider>
         <ToastProvider>
           <ScrollToTopOnNavigate />
+          <VisitTracker />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/trade" element={<TradePage />} />
             <Route path="/report" element={<ReportPage />} />
+            <Route path="/news" element={<NewsPage />} />
+            <Route path="/news/:id" element={<NewsPostPage />} />
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route
               path="/admin"
@@ -180,6 +211,26 @@ export function App() {
                 <RequireAdmin>
                   <RequirePermission permission="import.run">
                     <AdminImportPage />
+                  </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/news"
+              element={
+                <RequireAdmin>
+                  <RequirePermission permission="news.write">
+                    <AdminNewsPage />
+                  </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/stats"
+              element={
+                <RequireAdmin>
+                  <RequirePermission permission="stats.view">
+                    <AdminStatsPage />
                   </RequirePermission>
                 </RequireAdmin>
               }

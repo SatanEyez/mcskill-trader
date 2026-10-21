@@ -4,6 +4,7 @@ import {
   Boxes,
   KeyRound,
   MessageSquareWarning,
+  Newspaper,
   RefreshCw,
   ScrollText,
   ShieldCheck,
@@ -44,6 +45,7 @@ const GROUP_ICONS: Record<AuditGroup, LucideIcon> = {
   access: KeyRound,
   import: Upload,
   support: MessageSquareWarning,
+  news: Newspaper,
   auth: ShieldCheck,
 };
 
@@ -55,6 +57,7 @@ const GROUPS = [
   { value: 'access', label: 'Роли и префиксы' },
   { value: 'import', label: 'Импорт' },
   { value: 'support', label: 'Обращения' },
+  { value: 'news', label: 'Новости' },
   { value: 'auth', label: 'Входы' },
 ] as const;
 

@@ -1,4 +1,4 @@
-import { Calculator, LockKeyhole, MessageSquareWarning } from 'lucide-react';
+import { Calculator, LockKeyhole, MessageSquareWarning, Newspaper } from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { Logo } from './Logo';
@@ -16,6 +16,19 @@ export function Header() {
           <Link to="/#resources" className={clsx(NAV_LINK_CLASS, 'text-slate-400')}>
             Ресурсы
           </Link>
+          <NavLink
+            to="/news"
+            className={({ isActive }) =>
+              clsx(
+                NAV_LINK_CLASS,
+                'inline-flex items-center gap-2',
+                isActive ? 'bg-white/[0.05] text-white' : 'text-slate-400',
+              )
+            }
+          >
+            <Newspaper className="h-3.5 w-3.5" aria-hidden />
+            Новости
+          </NavLink>
           <NavLink
             to="/report"
             className={({ isActive }) =>
@@ -49,6 +62,17 @@ export function Header() {
             <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
             McSkill · OneBlock
           </span>
+
+          <NavLink
+            to="/news"
+            className={({ isActive }) =>
+              clsx('icon-btn md:hidden', isActive && 'border-accent/40 bg-accent/10 text-accent')
+            }
+            aria-label="Новости"
+            title="Новости"
+          >
+            <Newspaper className="h-4 w-4" aria-hidden />
+          </NavLink>
 
           <NavLink
             to="/report"

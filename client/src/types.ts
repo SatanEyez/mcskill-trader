@@ -113,6 +113,7 @@ export type AuditGroup =
   | 'access'
   | 'import'
   | 'support'
+  | 'news'
   | 'auth';
 export type AuditPeriod = '24h' | '7d' | '30d' | 'all';
 
@@ -303,4 +304,64 @@ export interface ImportSummary {
   skipped: number;
   images: number;
   errors: string[];
+}
+
+// ── Новости ──────────────────────────────────────────────────
+
+export interface NewsPost {
+  id: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  is_published: boolean;
+  views: number;
+  created_by_login: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+export interface NewsInput {
+  title: string;
+  body: string;
+  image_url: string;
+  is_published: boolean;
+}
+
+// ── Статистика посещений ─────────────────────────────────────
+
+export type VisitPeriod = '24h' | '7d' | '30d' | 'all';
+
+export interface VisitSeriesPoint {
+  bucket: string;
+  visits: number;
+  visitors: number;
+}
+
+export interface VisitPageStat {
+  path: string;
+  visits: number;
+}
+
+export interface VisitStats {
+  period: VisitPeriod;
+  visits: number;
+  visitors: number;
+  new_visitors: number;
+  returning_visitors: number;
+  online_now: number;
+  total_visits: number;
+  total_visitors: number;
+  first_visit_at: string | null;
+  last_visit_at: string | null;
+  series: VisitSeriesPoint[];
+  pages: VisitPageStat[];
+}
+
+export interface VisitorEntry {
+  id: string;
+  visits: number;
+  first_seen: string;
+  last_seen: string;
+  last_path: string;
 }

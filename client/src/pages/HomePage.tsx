@@ -10,6 +10,7 @@ import { Hero } from '../components/home/Hero';
 import { SearchControls } from '../components/home/SearchControls';
 import { ResourceGrid } from '../components/home/ResourceGrid';
 import { OnlineAdmins } from '../components/home/OnlineAdmins';
+import { NewsBlock } from '../components/news/NewsBlock';
 import { Pagination } from '../components/ui/Pagination';
 
 const PAGE_SIZE = 36;
@@ -197,6 +198,8 @@ export function HomePage() {
             </aside>
           </div>
         </div>
+
+        <NewsBlock />
       </main>
 
       <Footer />

@@ -13,9 +13,11 @@ import { auditRouter } from './modules/audit/audit.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { categoryRouter } from './modules/categories/category.routes.js';
 import { importRouter } from './modules/import/import.routes.js';
+import { newsRouter } from './modules/news/news.routes.js';
 import { presenceRouter } from './modules/presence/presence.routes.js';
 import { prefixRouter, roleRouter } from './modules/rbac/access.routes.js';
 import { resourceRouter } from './modules/resources/resource.routes.js';
+import { statsRouter } from './modules/stats/stats.routes.js';
 import { supportRouter } from './modules/support/support.routes.js';
 import { tradeRouter } from './modules/trade/trade.routes.js';
 import { uploadRouter } from './modules/uploads/upload.routes.js';
@@ -84,6 +86,8 @@ export function createApp(): Express {
   app.use('/api/uploads', uploadRouter);
   app.use('/api/import', importRouter);
   app.use('/api/support', supportRouter);
+  app.use('/api/news', newsRouter);
+  app.use('/api/stats', statsRouter);
   app.use('/api/presence', presenceRouter);
   app.use('/api', notFound);
 

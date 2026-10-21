@@ -15,6 +15,8 @@ import type {
   ImportJob,
   ImportSummary,
   LoginResponse,
+  NewsInput,
+  NewsPost,
   OnlineAdmin,
   PermissionMeta,
   RegisterResponse,
@@ -29,6 +31,9 @@ import type {
   TicketStatus,
   TradeCalculationInput,
   TradeCalculationResult,
+  VisitPeriod,
+  VisitStats,
+  VisitorEntry,
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '/api';
@@ -715,4 +720,103 @@ export async function calculateTrade(
     body: input,
   });
   return response.data;
+}
+
+// ── Новости ──────────────────────────────────────────────────
+
+export async function fetchNews(
+  params: { limit?: number; offset?: number } = {},
+): Promise<{ data: NewsPost[]; meta: ApiMeta }> {
+  const query = new URLSearchParams();
+
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return request<{ data: NewsPost[]; meta: ApiMeta }>(`/news${suffix}`);
+}
+
+/** Админский список: вместе с черновиками. */
+export async function fetchAllNews(
+  params: { limit?: number; offset?: number } = {},
+): Promise<{ data: NewsPost[]; meta: ApiMeta }> {
+  const query = new URLSearchParams();
+
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return request<{ data: NewsPost[]; meta: ApiMeta }>(`/news/all${suffix}`, { auth: true });
+}
+
+export async function fetchNewsPost(id: string): Promise<NewsPost> {
+  const response = await request<{ data: NewsPost }>(`/news/${encodeURIComponent(id)}`);
+  return response.data;
+}
+
+export async function createNews(input: NewsInput): Promise<NewsPost> {
+  const response = await request<{ data: NewsPost }>('/news', {
+    method: 'POST',
+    body: input,
+    auth: true,
+  });
+  return response.data;
+}
+
+export async function updateNews(id: string, input: Partial<NewsInput>): Promise<NewsPost> {
+  const response = await request<{ data: NewsPost }>(`/news/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: input,
+    auth: true,
+  });
+  return response.data;
+}
+
+export async function deleteNews(id: string): Promise<NewsPost> {
+  const response = await request<{ data: NewsPost }>(`/news/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    auth: true,
+  });
+  return response.data;
+}
+
+// ── Статистика посещений ─────────────────────────────────────
+
+/**
+ * Отправляет просмотр страницы. Никогда не бросает исключение:
+ * статистика не должна влиять на работу сайта.
+ */
+export async function trackVisit(path: string, referrer = ''): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/stats/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ path: path.slice(0, 255), referrer: referrer.slice(0, 255) }),
+      credentials: 'same-origin',
+      keepalive: true,
+    });
+  } catch {
+    // Молча: недоступная статистика не должна ломать страницу.
+  }
+}
+
+export async function fetchVisitStats(period: VisitPeriod): Promise<VisitStats> {
+  const response = await request<{ data: VisitStats }>(`/stats/visits?period=${period}`, {
+    auth: true,
+  });
+  return response.data;
+}
+
+export async function fetchVisitors(
+  params: { limit?: number; offset?: number } = {},
+): Promise<{ data: VisitorEntry[]; meta: ApiMeta }> {
+  const query = new URLSearchParams();
+
+  if (params.limit !== undefined) query.set('limit', String(params.limit));
+  if (params.offset !== undefined) query.set('offset', String(params.offset));
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return request<{ data: VisitorEntry[]; meta: ApiMeta }>(`/stats/visitors${suffix}`, {
+    auth: true,
+  });
 }

@@ -1,5 +1,7 @@
 import {
+  BarChart3,
   Boxes,
+  Newspaper,
   ScrollText,
   ShieldCheck,
   Tags,
@@ -29,6 +31,7 @@ interface Tab {
 const TABS: Tab[] = [
   { to: '/admin', label: 'Ресурсы', icon: Boxes, end: true, permission: 'resources.read' },
   { to: '/admin/categories', label: 'Категории', icon: Tags, end: false, permission: 'categories.read' },
+  { to: '/admin/news', label: 'Новости', icon: Newspaper, end: false, permission: 'news.write' },
   { to: '/admin/support', label: 'Обращения', icon: MessageSquareWarning, end: false, permission: 'support.read' },
   { to: '/admin/users', label: 'Пользователи', icon: UsersRound, end: false, permission: 'users.read' },
   {
@@ -40,6 +43,7 @@ const TABS: Tab[] = [
     anyPermission: 'prefixes.manage',
   },
   { to: '/admin/import', label: 'Импорт', icon: Upload, end: false, permission: 'import.run' },
+  { to: '/admin/stats', label: 'Статистика', icon: BarChart3, end: false, permission: 'stats.view' },
   { to: '/admin/logs', label: 'Логи', icon: ScrollText, end: false, permission: 'logs.read' },
   {
     to: '/admin/profile',
