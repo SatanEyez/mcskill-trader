@@ -23,7 +23,7 @@ const repoRoot = join(scriptDir, '..');
 const ICON_DIR = join(repoRoot, 'server', 'uploads', 'prices');
 const ICON_URL = '/uploads/prices';
 /** Метка версии в image_url: меняется при каждой пачке новых иконок. */
-const ICON_VERSION = '3d';
+const ICON_VERSION = '3d2';
 
 function readEnvFile(path) {
   const values = {};

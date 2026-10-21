@@ -28,9 +28,9 @@ const ICON_DIR = join(repoRoot, 'server', 'uploads', 'prices');
 const ICON_URL = '/uploads/prices';
 const CELL = 32;
 /** Метка версии для пересобранных 2D-иконок (у 3D — `3d`). */
-const ICON_VERSION = '2d';
+const ICON_VERSION = '2d2';
 /** Метка, которой помечены иконки из 3D-пакета. */
-const KEEP_VERSION = '3d';
+const KEEP_VERSION = '3d2';
 
 function readEnvFile(path) {
   const values = {};
