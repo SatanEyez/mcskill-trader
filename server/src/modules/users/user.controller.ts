@@ -42,7 +42,7 @@ export const approveUser: RequestHandler = asyncHandler(async (req, res) => {
     entityType: 'user',
     entityId: data.id,
     entityLabel: data.login,
-    details: { login: data.login },
+    details: { login: data.login, role: data.role_name },
   });
 
   res.json({ data });

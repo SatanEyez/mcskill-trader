@@ -330,8 +330,12 @@ export async function createPendingUser(login: string, passwordHash: string): Pr
     throw new HttpError(409, 'Такой логин уже занят');
   }
 
+  // Новичок всегда начинает стажёром; администратора выдаёт владелец вручную.
   const role = await db.query<{ id: string }>(
-    "SELECT id FROM admin_roles WHERE code = 'administrator'",
+    `SELECT id FROM admin_roles
+      WHERE code IN ('chat_stajer', 'administrator')
+      ORDER BY FIELD(code, 'chat_stajer', 'administrator')
+      LIMIT 1`,
   );
 
   const id = randomUUID();
@@ -429,15 +433,43 @@ export async function approveUser(id: string, actor: AuthPayload): Promise<Admin
 
   const db = await getDb();
 
+  const internRole = await db.query<{ id: string }>(
+    "SELECT id FROM admin_roles WHERE code = 'chat_stajer' LIMIT 1",
+  );
+  const internPrefix = await db.query<{ id: string }>(
+    "SELECT id FROM admin_prefixes WHERE name = 'Стажёр' LIMIT 1",
+  );
+
+  // При одобрении выдаём «Стажёра» вместо администратора. Уже назначенную
+  // вручную роль (модератор, поддержка и т.п.) не трогаем.
+  const assignIntern =
+    internRole.rows.length > 0 &&
+    (target.role_code === null || target.role_code === 'administrator');
+  const isIntern = target.role_code === 'chat_stajer' || assignIntern;
+  const roleId = internRole.rows[0]?.id ?? null;
+  const prefixId = internPrefix.rows[0]?.id ?? null;
+
   await db.query(
     `UPDATE admin_users
         SET status = 'approved',
             reviewed_at = CURRENT_TIMESTAMP(3),
             reviewed_by = ?,
             reviewed_by_login = ?,
-            updated_at = CURRENT_TIMESTAMP(3)
+            updated_at = CURRENT_TIMESTAMP(3),
+            role_id = CASE WHEN ? THEN ? ELSE role_id END,
+            role = CASE WHEN ? THEN 'admin' ELSE role END,
+            prefix_id = CASE WHEN ? AND prefix_id IS NULL THEN ? ELSE prefix_id END
       WHERE id = ?`,
-    [actor.sub, actor.login, id],
+    [
+      actor.sub,
+      actor.login,
+      assignIntern ? 1 : 0,
+      roleId,
+      assignIntern ? 1 : 0,
+      isIntern ? 1 : 0,
+      prefixId,
+      id,
+    ],
   );
 
   return getUserById(id);
