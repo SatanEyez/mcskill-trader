@@ -5,7 +5,8 @@ import { amountDigitCount, formatPriceDots, formatQuantityLabel } from '../../li
 
 interface TradeSummaryProps {
   result: TradeCalculationResult;
-  hasLines: boolean;
+  /** Есть предметы или монеты хотя бы с одной стороны. */
+  hasContent: boolean;
   /** Причина, по которой «минка к минке» недоступна; `null` — кнопка активна. */
   alignDisabledReason: string | null;
   /** Что именно изменилось после последнего выравнивания. */
@@ -30,7 +31,7 @@ const TONE_STYLES: Record<Tone, string> = {
 
 export function TradeSummary({
   result,
-  hasLines,
+  hasContent,
   alignDisabledReason,
   alignNote,
   ruleViolations,
@@ -63,7 +64,7 @@ export function TradeSummary({
   const hugeA = amountDigitCount(sideA.total) > 25;
   const hugeB = amountDigitCount(sideB.total) > 25;
 
-  const tone: Tone = !hasLines
+  const tone: Tone = !hasContent
     ? 'neutral'
     : delta === 0
       ? 'balanced'
@@ -71,16 +72,16 @@ export function TradeSummary({
         ? 'pay'
         : 'receive';
 
-  const title = !hasLines
-    ? 'Списки пусты'
+  const title = !hasContent
+    ? 'Сделка пуста'
     : delta === 0
       ? 'Обмен равноценный'
       : delta > 0
         ? 'Вы доплачиваете'
         : 'Вам доплачивают';
 
-  const hint = !hasLines
-    ? 'Добавьте предметы в обе стороны — покажем разницу по минимальным ценам.'
+  const hint = !hasContent
+    ? 'Добавьте предметы или монеты в обе стороны — покажем разницу по минимальным ценам.'
     : delta === 0
       ? 'Стороны совпали по стоимости: доплата не нужна.'
       : delta > 0
@@ -115,6 +116,11 @@ export function TradeSummary({
               {sideA.items_count} поз. · {formatQuantityLabel(sideA.total_quantity)}
             </p>
           )}
+          {sideA.coins > 0 && (
+            <p className="mt-0.5 whitespace-nowrap text-right text-[9px] text-amber-200/70">
+              в т.ч. монеты: {formatPriceDots(sideA.coins)}
+            </p>
+          )}
         </div>
 
         <div>
@@ -129,6 +135,11 @@ export function TradeSummary({
           {sideB.items_count > 0 && (
             <p className="mt-0.5 whitespace-nowrap text-right text-[9px] text-slate-500">
               {sideB.items_count} поз. · {formatQuantityLabel(sideB.total_quantity)}
+            </p>
+          )}
+          {sideB.coins > 0 && (
+            <p className="mt-0.5 whitespace-nowrap text-right text-[9px] text-amber-200/70">
+              в т.ч. монеты: {formatPriceDots(sideB.coins)}
             </p>
           )}
         </div>
@@ -147,7 +158,7 @@ export function TradeSummary({
         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] opacity-80">Баланс</p>
         <p className="mt-1 font-display text-base font-semibold text-white">{title}</p>
 
-        {hasLines && delta !== 0 && (
+        {hasContent && delta !== 0 && (
           <p className={`mt-1 whitespace-nowrap font-display font-bold leading-tight ${deltaSize}`}>
             {formatPriceDots(Math.abs(delta))}
             <span className="ml-1 font-sans text-[10px] font-medium uppercase tracking-wider opacity-80">
@@ -159,7 +170,7 @@ export function TradeSummary({
         <p className="mt-2 text-[10px] leading-relaxed opacity-90">{hint}</p>
       </div>
 
-      {hasLines && (ruleViolations > 0 || ruleWarnings > 0) && (
+      {hasContent && (ruleViolations > 0 || ruleWarnings > 0) && (
         <a
           href="#trade-rules"
           className={clsx(
@@ -211,7 +222,7 @@ export function TradeSummary({
       <button
         type="button"
         onClick={onClearAll}
-        disabled={!hasLines}
+        disabled={!hasContent}
         className="btn btn-danger mt-3 w-full py-2 text-xs"
       >
         <Trash2 className="h-3.5 w-3.5" aria-hidden />

@@ -157,6 +157,9 @@ export interface TradeLineInput {
 export interface TradeCalculationInput {
   side_a: TradeLineInput[];
   side_b: TradeLineInput[];
+  /** Монеты, которые сторона добавляет к предметам. */
+  coins_a?: number;
+  coins_b?: number;
 }
 
 export interface TradeLineResult {
@@ -171,6 +174,11 @@ export interface TradeLineResult {
 
 export interface TradeSideResult {
   lines: TradeLineResult[];
+  /** Стоимость только предметов, без монет. */
+  items_total: number;
+  /** Монеты, добавленные к стороне. */
+  coins: number;
+  /** Стоимость стороны целиком: предметы + монеты. */
   total: number;
   items_count: number;
   total_quantity: number;

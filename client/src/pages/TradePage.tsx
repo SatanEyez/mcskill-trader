@@ -27,7 +27,7 @@ import { formatPriceDots, formatQuantityDots } from '../lib/format';
 import { checkTradeRules } from '../lib/trade-rules';
 import type { Resource } from '../types';
 
-const EMPTY_STATE: TradeState = { sideA: [], sideB: [] };
+const EMPTY_STATE: TradeState = { sideA: [], sideB: [], coinsA: 0, coinsB: 0 };
 
 const SIDE_TITLES: Record<TradeSideKey, string> = {
   a: 'Я отдаю',
@@ -113,8 +113,8 @@ export function TradePage() {
   }, [hydrated, resources]);
 
   const calculation = useMemo(
-    () => calculateTradeLocal(state.sideA, state.sideB, resources),
-    [state.sideA, state.sideB, resources],
+    () => calculateTradeLocal(state.sideA, state.sideB, resources, state.coinsA, state.coinsB),
+    [state.sideA, state.sideB, state.coinsA, state.coinsB, resources],
   );
 
   const rulesReport = useMemo(
@@ -143,12 +143,31 @@ export function TradePage() {
     [pickerSide, updateSide],
   );
 
+  const handleCoinsChange = useCallback((side: TradeSideKey, coins: number) => {
+    setAlignNote(null);
+    setState((current) =>
+      side === 'a' ? { ...current, coinsA: coins } : { ...current, coinsB: coins },
+    );
+  }, []);
+
   const handleClearAll = useCallback(() => {
     setAlignNote(null);
     setState(EMPTY_STATE);
   }, []);
 
-  const hasLines = state.sideA.length > 0 || state.sideB.length > 0;
+  const handleClearSide = useCallback((side: TradeSideKey) => {
+    setAlignNote(null);
+    setState((current) =>
+      side === 'a'
+        ? { ...current, sideA: [], coinsA: 0 }
+        : { ...current, sideB: [], coinsB: 0 },
+    );
+  }, []);
+
+  const hasItems = state.sideA.length > 0 || state.sideB.length > 0;
+  const hasContent = hasItems || state.coinsA > 0 || state.coinsB > 0;
+  const hasBothSides =
+    (state.sideA.length > 0 || state.coinsA > 0) && (state.sideB.length > 0 || state.coinsB > 0);
   const minToMin = useMemo(() => alignMinToMin(state, resources), [state, resources]);
 
   /** «Минка к минке»: добираем количество в менее ценной стороне. */
@@ -174,10 +193,10 @@ export function TradePage() {
     );
   }, [state, resources]);
 
-  const alignDisabledReason = !hasLines
+  const alignDisabledReason = !hasItems
     ? 'Сначала добавьте предметы в обе стороны'
     : state.sideA.length === 0 || state.sideB.length === 0
-      ? 'Заполните обе стороны — пересчитывать нечего'
+      ? 'Заполните обе стороны предметами — монеты выравнивать не нужно'
       : !minToMin
         ? 'Нужны предметы с минимальной ценой больше нуля'
         : !minToMin.changed
@@ -209,8 +228,8 @@ export function TradePage() {
               Соберите обе стороны обмена
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-              Добавьте предметы в оба списка и укажите количество — калькулятор посчитает стоимость
-              сторон по минимальным ценам сервера и покажет, кому положена доплата.
+              Добавьте предметы и монеты в оба списка — калькулятор посчитает стоимость сторон по
+              минимальным ценам сервера и покажет, кому положена доплата.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2 text-[10px]">
@@ -283,23 +302,26 @@ export function TradePage() {
                   className="order-1 min-w-0"
                   tone="a"
                   title={SIDE_TITLES.a}
-                  hint="Предметы, которые уходят из вашего инвентаря"
+                  hint="Предметы и монеты, которые уходят из вашего инвентаря"
                   lines={state.sideA}
                   resources={resources}
                   total={calculation.side_a.total}
+                  itemsTotal={calculation.side_a.items_total}
+                  coins={state.coinsA}
                   totalQuantity={calculation.side_a.total_quantity}
                   onAdd={() => setPickerSide('a')}
+                  onCoinsChange={(coins) => handleCoinsChange('a', coins)}
                   onQuantityChange={(id, quantity) =>
                     updateSide('a', (lines) => setLineQuantity(lines, id, quantity))
                   }
                   onRemove={(id) => updateSide('a', (lines) => removeLine(lines, id))}
-                  onClear={() => updateSide('a', () => [])}
+                  onClear={() => handleClearSide('a')}
                 />
 
                 <TradeSummary
                   className="order-3 min-w-0 lg:order-2 lg:sticky lg:top-24"
                   result={calculation}
-                  hasLines={hasLines}
+                  hasContent={hasContent}
                   alignDisabledReason={alignDisabledReason}
                   alignNote={alignNote}
                   onAlign={handleAlign}
@@ -312,33 +334,36 @@ export function TradePage() {
                   className="order-2 min-w-0 lg:order-3"
                   tone="b"
                   title={SIDE_TITLES.b}
-                  hint="Предметы, которые вы получаете взамен"
+                  hint="Предметы и монеты, которые вы получаете взамен"
                   lines={state.sideB}
                   resources={resources}
                   total={calculation.side_b.total}
+                  itemsTotal={calculation.side_b.items_total}
+                  coins={state.coinsB}
                   totalQuantity={calculation.side_b.total_quantity}
                   onAdd={() => setPickerSide('b')}
+                  onCoinsChange={(coins) => handleCoinsChange('b', coins)}
                   onQuantityChange={(id, quantity) =>
                     updateSide('b', (lines) => setLineQuantity(lines, id, quantity))
                   }
                   onRemove={(id) => updateSide('b', (lines) => removeLine(lines, id))}
-                  onClear={() => updateSide('b', () => [])}
+                  onClear={() => handleClearSide('b')}
                 />
               </div>
 
               <TradeRulesPanel
                 report={rulesReport}
-                hasLines={hasLines}
-                hasBothSides={state.sideA.length > 0 && state.sideB.length > 0}
+                hasContent={hasContent}
+                hasBothSides={hasBothSides}
                 className="mt-4"
               />
 
               <p className="mt-5 flex items-start gap-2 text-[11px] leading-relaxed text-slate-600">
                 <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
                 Расчёт справочный: суммы округляются до сотых, цены берутся из каталога минималок.
-                Кнопка «минка к минке» добирает количество в менее ценной стороне и всегда округляет
-                его вверх, чтобы минимальные цены не нарушались. Списки хранятся только в вашем
-                браузере.
+                Монеты входят в стоимость стороны и учитываются в доплате. Кнопка «минка к минке»
+                добирает количество в менее ценной стороне и всегда округляет его вверх, чтобы
+                минимальные цены не нарушались. Списки хранятся только в вашем браузере.
               </p>
 
               <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-100/85">

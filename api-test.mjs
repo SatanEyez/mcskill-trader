@@ -633,6 +633,42 @@ try {
   );
   check('items_count и total_quantity посчитаны', tradeData?.side_a?.items_count === 1 && tradeData?.side_a?.total_quantity === 64);
 
+  // Монеты в сделке: входят в стоимость стороны и в delta, но не в items_total.
+  const withCoins = await api('/trade/calculate', {
+    method: 'POST',
+    body: JSON.stringify({
+      side_a: [{ resource_id: resourceId, quantity: 64 }],
+      side_b: [{ resource_id: second.id, quantity: 16 }],
+      coins_a: 500.25,
+      coins_b: 0,
+    }),
+  });
+  const coinsData = withCoins.body?.data;
+  check('POST /trade/calculate с монетами → 200', withCoins.status === 200, json(withCoins.body));
+  check(
+    'монеты стороны А входят в total',
+    coinsData?.side_a?.items_total === expectedA &&
+      coinsData?.side_a?.coins === 500.25 &&
+      coinsData?.side_a?.total === Math.round((expectedA + 500.25) * 100) / 100,
+    json(coinsData?.side_a),
+  );
+  check(
+    'delta учитывает монеты',
+    coinsData?.delta === Math.round((expectedB - expectedA - 500.25) * 100) / 100,
+    `got=${coinsData?.delta}`,
+  );
+  check(
+    'без монет coins = 0 (обратная совместимость)',
+    tradeData?.side_a?.coins === 0 && tradeData?.side_a?.items_total === expectedA,
+    json(tradeData?.side_a),
+  );
+
+  const badCoins = await api('/trade/calculate', {
+    method: 'POST',
+    body: JSON.stringify({ side_a: [], side_b: [], coins_a: -1 }),
+  });
+  check('отрицательные монеты → 400', badCoins.status === 400, json(badCoins.body));
+
   const emptySide = await api('/trade/calculate', {
     method: 'POST',
     body: JSON.stringify({ side_a: [], side_b: [{ resource_id: second.id, quantity: 1 }] }),

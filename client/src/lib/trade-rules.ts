@@ -221,7 +221,11 @@ export function checkTradeRules(
   const giveawayA = sideA.filter((line) => isGiveawayRestricted(line.name));
   const giveawayB = sideB.filter((line) => isGiveawayRestricted(line.name));
 
-  if (sideA.length === 0 && giveawayB.length > 0) {
+  // Сторона с монетами — уже не пустая: это обмен, а не раздача.
+  const sideAEmpty = sideA.length === 0 && result.side_a.coins <= 0;
+  const sideBEmpty = sideB.length === 0 && result.side_b.coins <= 0;
+
+  if (sideAEmpty && giveawayB.length > 0) {
     notices.push({
       id: 'giveaway-side-b',
       rule: '9.7',
@@ -234,7 +238,7 @@ export function checkTradeRules(
     });
   }
 
-  if (sideB.length === 0 && giveawayA.length > 0) {
+  if (sideBEmpty && giveawayA.length > 0) {
     notices.push({
       id: 'giveaway-side-a',
       rule: '9.7',
@@ -249,8 +253,8 @@ export function checkTradeRules(
 
   // 9.10 — неравноценный обмен без подтверждённой доплаты.
   if (
-    sideA.length > 0 &&
-    sideB.length > 0 &&
+    (sideA.length > 0 || result.side_a.coins > 0) &&
+    (sideB.length > 0 || result.side_b.coins > 0) &&
     Math.abs(result.delta) > 0.005 &&
     !isLargeTradeWithinTolerance(result)
   ) {
@@ -260,7 +264,7 @@ export function checkTradeRules(
       severity: 'warning',
       title: 'Стороны не равноценны',
       message:
-        `Разница по минимальным ценам — ${formatPrice(Math.abs(result.delta))} монет. ` +
+        `Разница с учётом монет — ${formatPrice(Math.abs(result.delta))} монет. ` +
         'Доплата должна пройти в игре и подтверждаться логами сервера, иначе сделку могут ' +
         'квалифицировать как неравноценный обмен (п. 9.10). Для сделок от 1 млн монет ' +
         'допустима разница до 10 000 монет.',

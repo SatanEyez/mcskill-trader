@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_TRADE_LINES, MAX_TRADE_QUANTITY } from './trade.types.js';
+import { MAX_TRADE_COINS, MAX_TRADE_LINES, MAX_TRADE_QUANTITY } from './trade.types.js';
 
 const tradeLineSchema = z
   .object({
@@ -25,5 +25,15 @@ export const calculateTradeSchema = z
   .object({
     side_a: tradeSideSchema,
     side_b: tradeSideSchema,
+    coins_a: z.coerce
+      .number({ invalid_type_error: 'Монеты должны быть числом' })
+      .min(0, 'Монеты не могут быть отрицательными')
+      .max(MAX_TRADE_COINS, 'Слишком много монет')
+      .default(0),
+    coins_b: z.coerce
+      .number({ invalid_type_error: 'Монеты должны быть числом' })
+      .min(0, 'Монеты не могут быть отрицательными')
+      .max(MAX_TRADE_COINS, 'Слишком много монет')
+      .default(0),
   })
   .strict();

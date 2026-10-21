@@ -4,7 +4,8 @@ import type { TradeRulesReport } from '../../lib/trade-rules';
 
 interface TradeRulesPanelProps {
   report: TradeRulesReport;
-  hasLines: boolean;
+  /** Есть предметы или монеты хотя бы с одной стороны. */
+  hasContent: boolean;
   /** Заполнены обе стороны — только тогда сделку можно проверить целиком. */
   hasBothSides: boolean;
   className?: string;
@@ -27,7 +28,7 @@ const SEVERITY_STYLES = {
 
 export function TradeRulesPanel({
   report,
-  hasLines,
+  hasContent,
   hasBothSides,
   className,
 }: TradeRulesPanelProps) {
@@ -79,14 +80,14 @@ export function TradeRulesPanel({
       </div>
 
       <div className="mt-4" aria-live="polite">
-        {!hasLines ? (
+        {!hasContent ? (
           <p className="rounded-xl border border-dashed border-white/[0.08] px-3.5 py-3 text-[11px] leading-relaxed text-slate-500">
-            Добавьте предметы в обе стороны — проверим сделку по правилам экономики.
+            Добавьте предметы или монеты в обе стороны — проверим сделку по правилам экономики.
           </p>
         ) : total === 0 && !hasBothSides ? (
           <p className="rounded-xl border border-dashed border-amber-400/20 bg-amber-400/[0.03] px-3.5 py-3 text-[11px] leading-relaxed text-slate-400">
-            Пока заполнена только одна сторона. Добавьте встречные предметы — проверим равноценность
-            обмена и запрет на раздачу.
+            Пока заполнена только одна сторона. Добавьте встречные предметы или монеты — проверим
+            равноценность обмена и запрет на раздачу.
           </p>
         ) : total === 0 ? (
           <div className="flex items-start gap-2.5 rounded-xl border border-accent/20 bg-accent/[0.05] px-3.5 py-3">

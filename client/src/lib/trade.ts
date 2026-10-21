@@ -9,6 +9,8 @@ import type {
 export const MAX_TRADE_LINES = 32;
 /** 10^18 — квинтиллион. */
 export const MAX_TRADE_QUANTITY = 1_000_000_000_000_000_000;
+/** 10^15 — квадриллион монет: с запасом больше любой минималки каталога. */
+export const MAX_TRADE_COINS = 1_000_000_000_000_000;
 
 export const TRADE_STORAGE_KEY = 'mcskill.trade.v1';
 
@@ -20,6 +22,9 @@ export interface TradeLine {
 export interface TradeState {
   sideA: TradeLine[];
   sideB: TradeLine[];
+  /** Монеты, которые добавляются к предметам стороны. */
+  coinsA: number;
+  coinsB: number;
 }
 
 export type TradeSide = 'a' | 'b';
@@ -32,6 +37,12 @@ function round(value: number, digits = 2): number {
 export function clampQuantity(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(MAX_TRADE_QUANTITY, Math.max(1, Math.trunc(value)));
+}
+
+/** Монеты — неотрицательное число с копейками, не больше лимита. */
+export function clampCoins(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(MAX_TRADE_COINS, Math.max(0, round(value)));
 }
 
 /** Добавляет предмет в сторону. Повторный выбор увеличивает количество. */
@@ -70,6 +81,7 @@ export function removeLine(lines: TradeLine[], resourceId: string): TradeLine[] 
 function calculateSide(
   lines: TradeLine[],
   resourcesById: Map<string, Resource>,
+  coins = 0,
 ): TradeSideResult {
   const resultLines: TradeLineResult[] = [];
 
@@ -90,9 +102,14 @@ function calculateSide(
     });
   }
 
+  const itemsTotal = round(resultLines.reduce((sum, line) => sum + line.total, 0));
+  const sideCoins = clampCoins(coins);
+
   return {
     lines: resultLines,
-    total: round(resultLines.reduce((sum, line) => sum + line.total, 0)),
+    items_total: itemsTotal,
+    coins: sideCoins,
+    total: round(itemsTotal + sideCoins),
     items_count: resultLines.length,
     total_quantity: resultLines.reduce((sum, line) => sum + line.quantity, 0),
   };
@@ -106,10 +123,12 @@ export function calculateTradeLocal(
   sideA: TradeLine[],
   sideB: TradeLine[],
   resources: Resource[],
+  coinsA = 0,
+  coinsB = 0,
 ): TradeCalculationResult {
   const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-  const resultA = calculateSide(sideA, resourcesById);
-  const resultB = calculateSide(sideB, resourcesById);
+  const resultA = calculateSide(sideA, resourcesById, coinsA);
+  const resultB = calculateSide(sideB, resourcesById, coinsB);
   const delta = round(resultB.total - resultA.total);
 
   return {
@@ -153,6 +172,8 @@ const QUANTITY_EPSILON = 1e-9;
  *
  * Правила:
  * - пропорции внутри стороны сохраняются — все строки получают один множитель;
+ * - монеты сторон не меняются: они уже входят в стоимость, поэтому цель по предметам —
+ *   стоимость второй стороны минус свои монеты;
  * - количество округляется вверх и не ниже 1, поэтому вторая сторона
  *   не получает меньше своих минималок — минимальную цену нарушить нельзя;
  * - если округление вверх перелетает цель сильнее текущего разрыва, ничего не меняем
@@ -163,10 +184,18 @@ const QUANTITY_EPSILON = 1e-9;
  */
 export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMinResult | null {
   const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-  const totals = calculateTradeLocal(state.sideA, state.sideB, resources);
+  const totals = calculateTradeLocal(
+    state.sideA,
+    state.sideB,
+    resources,
+    state.coinsA,
+    state.coinsB,
+  );
 
   const side: TradeSide = totals.side_b.total <= totals.side_a.total ? 'b' : 'a';
   const sourceLines = side === 'b' ? state.sideB : state.sideA;
+  const sourceCoins = side === 'b' ? totals.side_b.coins : totals.side_a.coins;
+  const referenceCoins = side === 'b' ? totals.side_a.coins : totals.side_b.coins;
   const referenceTotal = side === 'b' ? totals.side_a.total : totals.side_b.total;
   const sourceTotal = side === 'b' ? totals.side_b.total : totals.side_a.total;
 
@@ -193,6 +222,10 @@ export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMi
   const referenceSide: TradeSide = side === 'b' ? 'a' : 'b';
   const referenceLines = side === 'b' ? state.sideA : state.sideB;
 
+  // Сколько должны стоить предметы менее ценной стороны, чтобы вместе
+  // с её монетами догнать вторую сторону.
+  const targetItemValue = round(referenceTotal - sourceCoins);
+
   // Потолок стоимости, который можно получить, добрав количество до лимита.
   const maxSourceValue = sourceLines.reduce((sum, line) => {
     const unitPrice = pricedById.get(line.resourceId)?.unitPrice ?? 0;
@@ -201,8 +234,23 @@ export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMi
 
   // Добрать менее ценную сторону до потолка всё равно не хватает (цены слишком разные):
   // тогда уменьшаем более ценную сторону до текущей стоимости менее ценной.
-  if (maxSourceValue < referenceTotal) {
-    const factorDown = sourceTotal / referenceTotal;
+  if (maxSourceValue < targetItemValue) {
+    const referenceItemValue = round(referenceTotal - referenceCoins);
+    const targetReferenceItems = round(sourceTotal - referenceCoins);
+
+    if (referenceItemValue <= 0 || targetReferenceItems <= 0) {
+      return {
+        side: referenceSide,
+        mode: 'reduce',
+        lines: referenceLines,
+        changes: [],
+        reference_total: sourceTotal,
+        total: referenceTotal,
+        changed: false,
+      };
+    }
+
+    const factorDown = targetReferenceItems / referenceItemValue;
 
     const reducedLines = referenceLines.map((line) => {
       const resource = resourcesById.get(line.resourceId);
@@ -232,7 +280,7 @@ export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMi
       });
     }
 
-    const reducedSide = calculateSide(reducedLines, resourcesById);
+    const reducedSide = calculateSide(reducedLines, resourcesById, referenceCoins);
 
     return {
       side: referenceSide,
@@ -245,7 +293,7 @@ export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMi
     };
   }
 
-  const factor = referenceTotal / currentValue;
+  const factor = targetItemValue / currentValue;
 
   const lines = sourceLines.map((line) => {
     const entry = pricedById.get(line.resourceId);
@@ -272,7 +320,7 @@ export function alignMinToMin(state: TradeState, resources: Resource[]): MinToMi
     });
   }
 
-  const nextSide = calculateSide(lines, resourcesById);
+  const nextSide = calculateSide(lines, resourcesById, sourceCoins);
   const gap = round(referenceTotal - sourceTotal);
   const overshoot = round(nextSide.total - referenceTotal);
 
@@ -335,9 +383,17 @@ export function pruneTradeState(state: TradeState, resources: Resource[]): Trade
   const knownIds = new Set(resources.map((resource) => resource.id));
 
   return {
+    ...state,
     sideA: state.sideA.filter((line) => knownIds.has(line.resourceId)),
     sideB: state.sideB.filter((line) => knownIds.has(line.resourceId)),
   };
+}
+
+/** Монеты из localStorage: старые сохранения без них читаются как 0. */
+function parseCoins(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return 0;
+
+  return clampCoins(value);
 }
 
 export function loadTradeState(): TradeState | null {
@@ -345,14 +401,24 @@ export function loadTradeState(): TradeState | null {
     const raw = localStorage.getItem(TRADE_STORAGE_KEY);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as { sideA?: unknown; sideB?: unknown } | null;
+    const parsed = JSON.parse(raw) as {
+      sideA?: unknown;
+      sideB?: unknown;
+      coinsA?: unknown;
+      coinsB?: unknown;
+    } | null;
     if (typeof parsed !== 'object' || parsed === null) return null;
 
     const sideA = parseLines(parsed.sideA);
     const sideB = parseLines(parsed.sideB);
     if (!sideA || !sideB) return null;
 
-    return { sideA, sideB };
+    return {
+      sideA,
+      sideB,
+      coinsA: parseCoins(parsed.coinsA),
+      coinsB: parseCoins(parsed.coinsB),
+    };
   } catch {
     return null;
   }

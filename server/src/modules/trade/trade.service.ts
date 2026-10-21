@@ -1,5 +1,6 @@
 import { getDb } from '../../db/index.js';
 import { HttpError } from '../../utils/http-error.js';
+import { MAX_TRADE_COINS } from './trade.types.js';
 import type {
   TradeCalculationInput,
   TradeCalculationResult,
@@ -59,6 +60,7 @@ async function loadResources(ids: string[]): Promise<Map<string, TradeResourceRo
 function calculateSide(
   lines: TradeLineInput[],
   resources: Map<string, TradeResourceRow>,
+  coins: number,
 ): TradeSideResult {
   const resultLines: TradeLineResult[] = lines.map((line) => {
     const resource = resources.get(line.resource_id)!;
@@ -75,9 +77,14 @@ function calculateSide(
     };
   });
 
+  const itemsTotal = round(resultLines.reduce((sum, line) => sum + line.total, 0));
+  const sideCoins = round(Math.min(MAX_TRADE_COINS, Math.max(0, coins)));
+
   return {
     lines: resultLines,
-    total: round(resultLines.reduce((sum, line) => sum + line.total, 0)),
+    items_total: itemsTotal,
+    coins: sideCoins,
+    total: round(itemsTotal + sideCoins),
     items_count: resultLines.length,
     total_quantity: resultLines.reduce((sum, line) => sum + line.quantity, 0),
   };
@@ -88,8 +95,8 @@ export async function calculateTrade(
 ): Promise<TradeCalculationResult> {
   const resources = await loadResources(collectResourceIds(input));
 
-  const sideA = calculateSide(input.side_a, resources);
-  const sideB = calculateSide(input.side_b, resources);
+  const sideA = calculateSide(input.side_a, resources, input.coins_a);
+  const sideB = calculateSide(input.side_b, resources, input.coins_b);
   const delta = round(sideB.total - sideA.total);
 
   let favoredSide: TradeFavoredSide = 'balanced';

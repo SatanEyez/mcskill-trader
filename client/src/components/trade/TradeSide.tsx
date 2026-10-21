@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { amountDigitCount, formatPriceDots, formatQuantityLabel } from '../../lib/format';
 import { MAX_TRADE_LINES, type TradeLine } from '../../lib/trade';
+import { CoinInput } from './CoinInput';
 import { TradeItemRow } from './TradeItemRow';
 
 interface TradeSideProps {
@@ -12,9 +13,15 @@ interface TradeSideProps {
   tone: 'a' | 'b';
   lines: TradeLine[];
   resources: Resource[];
+  /** Стоимость стороны целиком: предметы + монеты. */
   total: number;
+  /** Стоимость только предметов. */
+  itemsTotal: number;
+  /** Монеты, добавленные к стороне. */
+  coins: number;
   totalQuantity: number;
   onAdd: () => void;
+  onCoinsChange: (coins: number) => void;
   onQuantityChange: (resourceId: string, quantity: number) => void;
   onRemove: (resourceId: string) => void;
   onClear: () => void;
@@ -39,8 +46,11 @@ export function TradeSide({
   lines,
   resources,
   total,
+  itemsTotal,
+  coins,
   totalQuantity,
   onAdd,
+  onCoinsChange,
   onQuantityChange,
   onRemove,
   onClear,
@@ -95,11 +105,21 @@ export function TradeSide({
           <span className="text-[11px] text-slate-500">монет</span>
         </div>
 
+        {coins > 0 && lines.length > 0 && (
+          <p className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap text-[10px] text-slate-500">
+            <span>предметы {formatPriceDots(itemsTotal)}</span>
+            <span className="text-slate-600">+</span>
+            <span className="text-amber-200/80">{formatPriceDots(coins)}</span>
+          </p>
+        )}
+
         {totalQuantity > 0 && (
           <p className="mt-1 text-right text-[10px] text-slate-500 whitespace-nowrap">
             {formatQuantityLabel(totalQuantity)}
           </p>
         )}
+
+        <CoinInput className="mt-2" value={coins} onChange={onCoinsChange} />
       </div>
 
       {lines.length === 0 ? (
