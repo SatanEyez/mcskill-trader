@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   Clock4,
   Crown,
@@ -94,7 +94,11 @@ export function StaffListPanel({
     can('users.delete') && target.role !== 'owner' && !target.is_system && target.id !== currentUserId;
 
   const canManageRoles = (target: AdminUser): boolean =>
-    can('users.roles') && target.id !== currentUserId && !target.is_system;
+    can('users.roles') && !target.is_system;
+
+  /** Свою роль менять нельзя — только префикс. */
+  const canChangeRole = (target: AdminUser): boolean =>
+    canManageRoles(target) && target.id !== currentUserId;
 
   return (
     <>
@@ -292,14 +296,22 @@ export function StaffListPanel({
                         onClick={() => onAccess(member)}
                         disabled={busy}
                         className="icon-btn h-8 w-8 hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
-                        title={`Роль и префикс «${member.login}»`}
-                        aria-label={`Настроить роль и префикс ${member.login}`}
+                        title={
+                          member.id === currentUserId
+                            ? 'Изменить свой префикс'
+                            : `Роль и префикс «${member.login}»`
+                        }
+                        aria-label={
+                          member.id === currentUserId
+                            ? 'Изменить свой префикс'
+                            : `Настроить роль и префикс ${member.login}`
+                        }
                       >
                         <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                       </button>
                     )}
 
-                    {canManageRoles(member) && (
+                    {canChangeRole(member) && (
                       <button
                         type="button"
                         onClick={() =>

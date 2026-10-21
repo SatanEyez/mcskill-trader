@@ -176,7 +176,11 @@ export function AdminUsersPage() {
 
   /** Гибкие роли и префиксы меняет носитель права users.roles. */
   const canManageRoles = (target: AdminUser): boolean =>
-    can('users.roles') && target.id !== currentUser?.id && !target.is_system;
+    can('users.roles') && !target.is_system;
+
+  /** Свою роль менять нельзя, только префикс (правило продублировано на сервере). */
+  const canChangeRole = (target: AdminUser): boolean =>
+    canManageRoles(target) && target.id !== currentUser?.id;
 
   /** Кто и когда принял решение по заявке: логин приходит снимком с сервера. */
   const renderReview = (target: AdminUser) => {
@@ -305,7 +309,7 @@ export function AdminUsersPage() {
             )}
           >
             <UserCheck className="h-3.5 w-3.5" aria-hidden />
-            Администрация
+            Состав
             <span className="text-[10px] text-slate-500">{counts.approved}</span>
           </button>
         </div>
@@ -614,14 +618,22 @@ export function AdminUsersPage() {
                             onClick={() => setAccessUser(target)}
                             disabled={busy}
                             className="icon-btn h-8 w-8 hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
-                            title={`Роль и префикс «${target.login}»`}
-                            aria-label={`Настроить роль и префикс ${target.login}`}
+                            title={
+                              target.id === currentUser?.id
+                                ? 'Изменить свой префикс'
+                                : `Роль и префикс «${target.login}»`
+                            }
+                            aria-label={
+                              target.id === currentUser?.id
+                                ? 'Изменить свой префикс'
+                                : `Настроить роль и префикс ${target.login}`
+                            }
                           >
                             <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                           </button>
                         )}
 
-                        {canManageRoles(target) && (
+                        {canChangeRole(target) && (
                           <button
                             type="button"
                             onClick={() =>
@@ -682,6 +694,7 @@ export function AdminUsersPage() {
 
       <UserAccessDialog
         user={accessUser}
+        selfMode={accessUser !== null && accessUser.id === currentUser?.id}
         onClose={() => setAccessUser(null)}
         onUpdated={handleAccessUpdated}
       />

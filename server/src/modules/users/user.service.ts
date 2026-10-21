@@ -577,8 +577,9 @@ export async function updateUserAccess(
     throw new HttpError(400, 'Системный аккаунт нельзя изменить');
   }
 
-  if (previous.id === actor.sub) {
-    throw new HttpError(400, 'Нельзя изменить собственный доступ');
+  // Свой префикс менять можно, роль — нет: иначе можно обойти правила повышения.
+  if (previous.id === actor.sub && input.role_id !== previous.role_id) {
+    throw new HttpError(403, 'Нельзя изменить собственную роль — попросите другого владельца');
   }
 
   const db = await getDb();
