@@ -205,4 +205,14 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /*
+   * Превью трейда на главной не замирает, а переключает кадры «спокойно»:
+   * без сдвигов и масштаба, только прозрачность. Возвращаем мягкий переход,
+   * иначе смена кадров выглядит как резкое мигание.
+   */
+  .trade-preview,
+  .trade-preview * {
+    transition-duration: 420ms !important;
+  }
 }

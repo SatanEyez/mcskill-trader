@@ -14,9 +14,14 @@ import { formatPriceDots } from '../../lib/format';
 /**
  * Живое превью трейда вместо гифки.
  *
- * Зациклено, как гифка, но остаётся векторным: чёткое на любом экране,
- * весит ноль килобайт и уважает `prefers-reduced-motion` — тогда сразу
- * показывается финальный кадр. Пауза тоже есть, как у настоящей гифки.
+ * Зациклено, как гифка, но остаётся векторным: чёткое на любом экране
+ * и весит ноль килобайт.
+ *
+ * `prefers-reduced-motion` не выключает показ: Chrome на Windows берёт эту
+ * настройку из системы и в отличие от Opera отдаёт `reduce`, из-за чего
+ * превью раньше замирало на последнем кадре. Теперь в этом режиме кадры
+ * всё равно сменяются, но «спокойно» — без сдвигов и масштабирования,
+ * только по прозрачности и медленнее. Пауза доступна всегда.
  */
 
 interface DemoItem {
@@ -48,6 +53,9 @@ const GAP_TEXT = `${GAP_PERCENT.toFixed(1).replace('.', ',')}%`;
 const LAST_STEP = 5;
 const STEP_MS = 760;
 const HOLD_MS = 2800;
+/** Спокойный режим: без движения и медленнее, чтобы не «дёргать» глаз. */
+const CALM_STEP_MS = 1500;
+const CALM_HOLD_MS = 4200;
 
 const CAPTIONS = [
   'Выберите предметы в каталоге',
@@ -62,6 +70,7 @@ function PreviewSide({
   total,
   visibleFrom,
   totalsVisible,
+  calm,
   step,
 }: {
   label: string;
@@ -70,6 +79,7 @@ function PreviewSide({
   total: number;
   visibleFrom: number;
   totalsVisible: boolean;
+  calm: boolean;
   step: number;
 }) {
   const visibleCount = Math.max(0, Math.min(items.length, step - visibleFrom + 1));
@@ -101,7 +111,9 @@ function PreviewSide({
                 'flex items-center gap-2 rounded-lg border px-1.5 py-1 transition-all duration-500 ease-out',
                 visible
                   ? 'translate-y-0 scale-100 border-white/[0.07] bg-white/[0.03] opacity-100'
-                  : 'translate-y-1.5 scale-95 border-transparent bg-transparent opacity-0',
+                  : calm
+                    ? 'border-transparent bg-transparent opacity-0'
+                    : 'translate-y-1.5 scale-95 border-transparent bg-transparent opacity-0',
               )}
             >
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-white/[0.06] bg-void/60 p-1">
@@ -157,11 +169,14 @@ function PreviewSide({
 export function TradePreview() {
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [reduced, setReduced] = useState(false);
+  // Сразу с верным значением, иначе первый кадр успевает получить сдвиг/масштаб.
+  const [calm, setCalm] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(query.matches);
+    const update = () => setCalm(query.matches);
 
     update();
     query.addEventListener('change', update);
@@ -170,24 +185,23 @@ export function TradePreview() {
   }, []);
 
   useEffect(() => {
-    if (reduced || !playing) return;
+    if (!playing) return;
 
     const timer = window.setTimeout(
       () => setStep((current) => (current >= LAST_STEP ? 0 : current + 1)),
-      step >= LAST_STEP ? HOLD_MS : STEP_MS,
+      step >= LAST_STEP ? (calm ? CALM_HOLD_MS : HOLD_MS) : calm ? CALM_STEP_MS : STEP_MS,
     );
 
     return () => window.clearTimeout(timer);
-  }, [step, playing, reduced]);
+  }, [step, playing, calm]);
 
-  const shown = reduced ? LAST_STEP : step;
-  const totalsVisible = shown >= 4;
-  const ready = shown >= LAST_STEP;
-  const phase = shown === 0 ? 0 : ready ? 2 : 1;
+  const totalsVisible = step >= 4;
+  const ready = step >= LAST_STEP;
+  const phase = step === 0 ? 0 : ready ? 2 : 1;
 
   return (
     <figure
-      className="relative m-0"
+      className="trade-preview relative m-0"
       aria-label="Демонстрация работы трейд-калькулятора: предметы добавляются в обе стороны, калькулятор считает разницу, обмен признаётся верным"
     >
       <div
@@ -222,21 +236,19 @@ export function TradePreview() {
                   демо
                 </span>
 
-                {!reduced && (
-                  <button
-                    type="button"
-                    onClick={() => setPlaying((current) => !current)}
-                    className="grid h-6 w-6 place-items-center rounded-md border border-white/[0.08] bg-white/[0.03] text-slate-400 transition hover:border-accent/30 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                    aria-label={playing ? 'Остановить анимацию' : 'Запустить анимацию'}
-                    title={playing ? 'Остановить анимацию' : 'Запустить анимацию'}
-                  >
-                    {playing ? (
-                      <Pause className="h-3 w-3" aria-hidden />
-                    ) : (
-                      <Play className="h-3 w-3" aria-hidden />
-                    )}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setPlaying((current) => !current)}
+                  className="grid h-6 w-6 place-items-center rounded-md border border-white/[0.08] bg-white/[0.03] text-slate-400 transition hover:border-accent/30 hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                  aria-label={playing ? 'Остановить анимацию' : 'Запустить анимацию'}
+                  title={playing ? 'Остановить анимацию' : 'Запустить анимацию'}
+                >
+                  {playing ? (
+                    <Pause className="h-3 w-3" aria-hidden />
+                  ) : (
+                    <Play className="h-3 w-3" aria-hidden />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -248,7 +260,8 @@ export function TradePreview() {
                 total={TOTAL_GIVE}
                 visibleFrom={1}
                 totalsVisible={totalsVisible}
-                step={shown}
+                calm={calm}
+                step={step}
               />
               <PreviewSide
                 label="Я получаю"
@@ -257,7 +270,8 @@ export function TradePreview() {
                 total={TOTAL_RECEIVE}
                 visibleFrom={3}
                 totalsVisible={totalsVisible}
-                step={shown}
+                calm={calm}
+                step={step}
               />
             </div>
 
