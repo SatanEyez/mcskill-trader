@@ -145,3 +145,42 @@ export function formatDateTimeMsk(isoDate: string | null | undefined): string {
 export function normalizeSearch(value: string): string {
   return value.toLowerCase().replace(/[-\s]/g, '');
 }
+
+/** Разбивает строку на отдельные слова (дефисы и пробелы — разделители). */
+function words(value: string): string[] {
+  return value.toLowerCase().split(/[-\s]+/).filter((w) => w.length > 0);
+}
+
+/**
+ * Fuzzy-поиск: слова запроса могут идти в любом порядке, с ошибками
+ * в окончаниях. Подходит для поиска предметов по частям названия.
+ *
+ * Примеры:
+ *   "материя мета"        → находит "Мета-материя"
+ *   "тёмное кровавое ядро" → находит "Тёмное ядро кровавой луны"
+ *   "ядро тёмное"          → находит "Тёмное ядро кровавой луны"
+ */
+export function fuzzyMatch(query: string, target: string): boolean {
+  const qWords = words(query);
+  const tWords = words(target);
+
+  if (qWords.length === 0) return true;
+  if (tWords.length === 0) return false;
+
+  return qWords.every((qw) => {
+    // Точное вхождение слова запроса в слово названия (или наоборот)
+    if (tWords.some((tw) => tw.includes(qw) || qw.includes(tw))) return true;
+
+    // Не нашли — пробуем без последних 2 символов (русское окончание)
+    if (qw.length > 4) {
+      const stem = qw.slice(0, -2);
+      if (tWords.some((tw) => tw.includes(stem))) return true;
+    }
+
+    // И наоборот: короткое слово названия без окончания
+    return tWords.some((tw) => {
+      if (tw.length > 4 && qw.includes(tw.slice(0, -2))) return true;
+      return false;
+    });
+  });
+}

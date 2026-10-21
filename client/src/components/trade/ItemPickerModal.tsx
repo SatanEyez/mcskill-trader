@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { UNCATEGORIZED_LABEL } from '../../lib/constants';
 import { readableNameColor } from '../../lib/color';
-import { formatPrice, normalizeSearch } from '../../lib/format';
+import { formatPrice, fuzzyMatch } from '../../lib/format';
 import { MAX_TRADE_LINES } from '../../lib/trade';
 import { Modal } from '../ui/Modal';
 import { ItemImage } from '../ui/ItemImage';
@@ -52,10 +52,8 @@ export function ItemPickerModal({
   }, [resources]);
 
   const filtered = useMemo(() => {
-    const normalized = normalizeSearch(query);
-
     return resources.filter((resource) => {
-      const matchesSearch = !normalized || normalizeSearch(resource.name).includes(normalized);
+      const matchesSearch = !query.trim() || fuzzyMatch(query, resource.name);
       const matchesCategory =
         categoryId === 'all' ||
         (categoryId === 'none' ? resource.category_id === null : resource.category_id === categoryId);
