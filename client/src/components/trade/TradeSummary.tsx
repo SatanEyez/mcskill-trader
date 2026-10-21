@@ -1,7 +1,8 @@
 import { Calculator, Scale, ShieldAlert, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { TradeCalculationResult } from '../../types';
-import { formatPriceDots, formatQuantityLabel } from '../../lib/format';
+import { formatPrice, formatPriceDots, formatQuantityLabel } from '../../lib/format';
+import { equalityTolerance, isWithinEqualityTolerance } from '../../lib/trade-rules';
 import { AutoFitText } from '../ui/AutoFitText';
 
 interface TradeSummaryProps {
@@ -43,9 +44,12 @@ export function TradeSummary({
 }: TradeSummaryProps) {
   const { side_a: sideA, side_b: sideB, delta } = result;
 
+  // П. 9.10: погрешность 10% от суммы сделки — в этих пределах обмен равноценный.
+  const withinTolerance = hasContent && delta !== 0 && isWithinEqualityTolerance(result);
+
   const tone: Tone = !hasContent
     ? 'neutral'
-    : delta === 0
+    : delta === 0 || withinTolerance
       ? 'balanced'
       : delta > 0
         ? 'pay'
@@ -55,17 +59,21 @@ export function TradeSummary({
     ? 'Сделка пуста'
     : delta === 0
       ? 'Обмен равноценный'
-      : delta > 0
-        ? 'Вы доплачиваете'
-        : 'Вам доплачивают';
+      : withinTolerance
+        ? 'Разница в пределах погрешности'
+        : delta > 0
+          ? 'Вы доплачиваете'
+          : 'Вам доплачивают';
 
   const hint = !hasContent
     ? 'Добавьте предметы или монеты в обе стороны — покажем разницу по минимальным ценам.'
     : delta === 0
       ? 'Стороны совпали по стоимости: доплата не нужна.'
-      : delta > 0
-        ? 'Принимающая сторона дороже — разницу стоит доплатить.'
-        : 'Отдающая сторона дороже — доплата положена вам.';
+      : withinTolerance
+        ? `Разница не больше 10% от суммы сделки (${formatPrice(equalityTolerance(result))} монет) — доплата не требуется.`
+        : delta > 0
+          ? 'Принимающая сторона дороже — разницу стоит доплатить.'
+          : 'Отдающая сторона дороже — доплата положена вам.';
 
   const shareA = sideA.total + sideB.total > 0 ? sideA.total / (sideA.total + sideB.total) : 0.5;
 

@@ -1,11 +1,14 @@
-﻿import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  ImagePlus,
+  Loader2,
   MessageSquarePlus,
   MessagesSquare,
   Send,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
@@ -13,6 +16,7 @@ import { useChat } from '../hooks/useChat';
 import { useAuth } from '../context/AuthContext';
 import { formatDateMsk, formatDateTimeMsk, formatTimeMsk } from '../lib/format';
 import { isChatSoundEnabled, CHAT_SOUND_CHANGED_EVENT } from '../lib/chat-sound';
+import { ApiError, uploadImage } from '../lib/api';
 import type { ChatMessage, ChatRoom } from '../types';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
@@ -20,12 +24,17 @@ import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { Modal } from '../components/ui/Modal';
 import { Spinner } from '../components/ui/Spinner';
 
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
 function previewOf(room: ChatRoom): string {
   if (!room.last_message) return 'Сообщений пока нет';
 
   const text = room.last_message.message.replace(/\s+/g, ' ').trim();
 
-  return `${room.last_message.login}: ${text}`;
+  return text
+    ? `${room.last_message.login}: ${text}`
+    : `${room.last_message.login}: 📷 Фото`;
 }
 
 function roomTime(room: ChatRoom): string {
@@ -34,6 +43,8 @@ function roomTime(room: ChatRoom): string {
 }
 
 function MessageBubble({ message, own }: { message: ChatMessage; own: boolean }) {
+  const prefix = message.user_prefix;
+
   return (
     <div className={clsx('flex w-full gap-2.5', own ? 'flex-row-reverse' : 'flex-row')}>
       <AdminAvatar
@@ -45,20 +56,53 @@ function MessageBubble({ message, own }: { message: ChatMessage; own: boolean })
       />
 
       <div className={clsx('flex min-w-0 max-w-[78%] flex-col', own ? 'items-end' : 'items-start')}>
-        <div className="flex items-baseline gap-2 text-[10px] text-slate-500">
+        <div className="flex flex-wrap items-baseline gap-1.5 text-[10px] text-slate-500">
+          {prefix && (
+            <span
+              className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+              style={{
+                color: prefix.color,
+                borderColor: `${prefix.color}55`,
+                backgroundColor: `${prefix.color}1a`,
+              }}
+              title={`Префикс: ${prefix.name}`}
+            >
+              {prefix.name}
+            </span>
+          )}
           <span className="font-medium text-slate-400">{message.user_login}</span>
           <span>{formatTimeMsk(message.created_at)}</span>
         </div>
-        <div
-          className={clsx(
-            'mt-1 whitespace-pre-wrap break-words rounded-2xl border px-3.5 py-2 text-sm leading-relaxed shadow-sm',
-            own
-              ? 'rounded-tr-md border-accent/25 bg-accent/[0.12] text-accent-50'
-              : 'rounded-tl-md border-white/[0.07] bg-white/[0.04] text-slate-200',
-          )}
-        >
-          {message.message}
-        </div>
+
+        {message.image_url && (
+          <a
+            href={message.image_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 transition hover:border-accent/30"
+            title="Открыть фото"
+          >
+            <img
+              src={message.image_url}
+              alt="Фото в чате"
+              loading="lazy"
+              className="max-h-64 max-w-full object-contain"
+            />
+          </a>
+        )}
+
+        {message.message && (
+          <div
+            className={clsx(
+              'mt-1 whitespace-pre-wrap break-words rounded-2xl border px-3.5 py-2 text-sm leading-relaxed shadow-sm',
+              own
+                ? 'rounded-tr-md border-accent/25 bg-accent/[0.12] text-accent-50'
+                : 'rounded-tl-md border-white/[0.07] bg-white/[0.04] text-slate-200',
+            )}
+          >
+            {message.message}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -89,9 +133,50 @@ export function AdminChatPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(isChatSoundEnabled);
+  const [attachImage, setAttachImage] = useState<File | null>(null);
+  const [attachPreview, setAttachPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const clearAttachment = () => {
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachImage(null);
+    setAttachPreview(null);
+    setUploadError(null);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError('Неподдерживаемый формат: нужен PNG, JPG, WebP или GIF');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setUploadError('Файл слишком большой (макс. 5 МБ)');
+      event.target.value = '';
+      return;
+    }
+
+    setUploadError(null);
+    setAttachImage(file);
+    setAttachPreview(URL.createObjectURL(file));
+    event.target.value = '';
+  };
+
+  // Очистка blob URL при смене превью или размонтировании
+  useEffect(() => {
+    return () => {
+      if (attachPreview) URL.revokeObjectURL(attachPreview);
+    };
+  }, [attachPreview]);
 
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const nearBottomRef = useRef(true);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null;
@@ -139,11 +224,29 @@ export function AdminChatPage() {
 
   const handleSend = async (event: FormEvent) => {
     event.preventDefault();
-    if (!draft.trim() || sending) return;
+    if ((!draft.trim() && !attachImage) || sending || uploading) return;
 
-    const ok = await send(draft);
+    let imageUrl: string | null = null;
+
+    if (attachImage) {
+      setUploading(true);
+      setUploadError(null);
+      try {
+        const uploaded = await uploadImage(attachImage);
+        imageUrl = uploaded.url;
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : 'Не удалось загрузить фото';
+        setUploadError(msg);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    const ok = await send(draft, imageUrl);
     if (ok) {
       setDraft('');
+      clearAttachment();
       nearBottomRef.current = true;
       inputRef.current?.focus();
     }
@@ -404,19 +507,67 @@ export function AdminChatPage() {
                   </p>
                 )}
 
+                {attachPreview && (
+                  <div className="relative border-t border-white/[0.06] p-3 flex items-center gap-2">
+                    <img
+                      src={attachPreview}
+                      alt="Прикреплённое фото"
+                      className="h-16 w-16 rounded-lg object-cover border border-white/[0.08]"
+                    />
+                    <span className="text-sm text-slate-300 flex-1 truncate">
+                      {attachImage?.name}
+                    </span>
+                    {uploadError && (
+                      <span className="text-[11px] text-rose-300">{uploadError}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={clearAttachment}
+                      disabled={uploading}
+                      className="p-1.5 rounded hover:bg-white/[0.05] text-slate-400 hover:text-white transition"
+                      aria-label="Удалить фото"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
                 <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-white/[0.06] p-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending || uploading || !!attachImage}
+                    className="btn btn-ghost shrink-0 p-2"
+                    aria-label="Прикрепить фото"
+                    title="Прикрепить фото"
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImagePlus className="h-4 w-4" />
+                    )}
+                  </button>
                   <input
                     ref={inputRef}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder={`Сообщение в #${activeRoom.name}…`}
+                    placeholder={attachImage ? 'Добавьте подпись…' : `Сообщение в #${activeRoom?.name}…`}
                     maxLength={4000}
                     className="field flex-1 py-2.5 text-sm"
                     aria-label="Текст сообщения"
                   />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="chat-file-input"
+                    disabled={sending || uploading || !!attachImage}
+                  />
                   <button
                     type="submit"
-                    disabled={sending || !draft.trim()}
+                    disabled={sending || uploading || (!draft.trim() && !attachImage)}
                     className="btn btn-primary shrink-0 px-3.5 py-2.5"
                     aria-label="Отправить сообщение"
                   >

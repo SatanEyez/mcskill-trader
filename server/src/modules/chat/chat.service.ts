@@ -69,6 +69,11 @@ function toMessageDto(row: ChatMessageRow): ChatMessageDto {
     user_id: row.user_id,
     user_login: row.user_login,
     avatar_url: row.avatar_url ?? null,
+    user_prefix:
+      row.prefix_name && row.prefix_color
+        ? { name: row.prefix_name, color: row.prefix_color }
+        : null,
+    image_url: row.image_url ?? null,
     message: row.message,
     created_at: toIso(row.created_at),
   };
@@ -79,11 +84,15 @@ const MESSAGE_SELECT = `
          m.room_id,
          m.user_id,
          m.user_login,
+         m.image_url,
          u.avatar_url,
+         p.name AS prefix_name,
+         p.color AS prefix_color,
          m.message,
          m.created_at
     FROM chat_messages AS m
     LEFT JOIN admin_users AS u ON u.id = m.user_id
+    LEFT JOIN admin_prefixes AS p ON p.id = u.prefix_id
 `;
 
 /** Все комнаты с числом непрочитанных и последним сообщением. */
@@ -196,12 +205,14 @@ export async function sendMessage(
   roomId: string,
   actor: AuthPayload,
   text: string,
+  imageUrl: string | null = null,
 ): Promise<ChatMessageDto> {
   await assertRoomExists(roomId);
 
   const message = text.trim();
+  const image = imageUrl?.trim() || null;
 
-  if (message.length === 0) {
+  if (message.length === 0 && !image) {
     throw new HttpError(422, 'Сообщение не может быть пустым');
   }
 
@@ -212,13 +223,17 @@ export async function sendMessage(
     );
   }
 
+  if (image && (image.length > 512 || (!image.startsWith('/') && !/^https?:\/\//i.test(image)))) {
+    throw new HttpError(422, 'Некорректная ссылка на изображение');
+  }
+
   const db = await getDb();
   const id = randomUUID();
 
   await db.query(
-    `INSERT INTO chat_messages (id, room_id, user_id, user_login, message)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, roomId, actor.sub, actor.login, message],
+    `INSERT INTO chat_messages (id, room_id, user_id, user_login, message, image_url)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, roomId, actor.sub, actor.login, message, image],
   );
 
   // Автор сразу «прочитал» комнату, иначе своё же сообщение висело бы непрочитанным.

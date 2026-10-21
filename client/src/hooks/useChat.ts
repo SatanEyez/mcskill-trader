@@ -152,16 +152,17 @@ export function useChat() {
   }, [hasMore, loadingOlder, messages]);
 
   const send = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (text: string, imageUrl?: string | null): Promise<boolean> => {
       const roomId = activeRoomIdRef.current;
       const trimmed = text.trim();
+      const image = imageUrl ?? null;
 
-      if (!roomId || !trimmed || sending) return false;
+      if (!roomId || (!trimmed && !image) || sending) return false;
 
       setSending(true);
 
       try {
-        const message = await sendChatMessage(roomId, trimmed);
+        const message = await sendChatMessage(roomId, trimmed, image);
         // Сокет пришлёт это же сообщение всем, включая автора — дедуп по id.
         setMessages((current) =>
           current.some((item) => item.id === message.id) ? current : [...current, message],

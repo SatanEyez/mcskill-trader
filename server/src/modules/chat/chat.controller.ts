@@ -32,7 +32,12 @@ export const listMessages: RequestHandler = asyncHandler(async (req, res) => {
 
 export const sendMessage: RequestHandler = asyncHandler(async (req, res) => {
   const body = req.validatedBody as SendMessageBody;
-  const data = await chatService.sendMessage(getRoomId(req), req.auth!, body.message);
+  const data = await chatService.sendMessage(
+    getRoomId(req),
+    req.auth!,
+    body.message ?? '',
+    body.image_url ?? null,
+  );
   res.status(201).json({ data });
 });
 

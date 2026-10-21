@@ -49,19 +49,21 @@ export function maxAllowedPrice(minPrice: number): number {
 }
 
 /**
- * П. 9.10: в сделках от 1 млн монет разница до 10 000 монет считается
- * допустимой и не показывает замечание о неравноценности.
+ * П. 9.10: равноценность считается с погрешностью 10% от суммы сделки
+ * (стоимость обеих сторон). Разница в этих пределах не считается
+ * неравноценным обменом.
  */
-export const LARGE_TRADE_THRESHOLD = 1_000_000;
-export const LARGE_TRADE_DELTA_TOLERANCE = 10_000;
+export const EQUALITY_TOLERANCE_SHARE = 0.1;
 
-export function isLargeTradeWithinTolerance(result: TradeCalculationResult): boolean {
-  const maxTotal = Math.max(result.side_a.total, result.side_b.total);
+/** Допустимая разница сторон в монетах: 10% от суммы сделки. */
+export function equalityTolerance(result: TradeCalculationResult): number {
+  const total = result.side_a.total + result.side_b.total;
 
-  return (
-    maxTotal >= LARGE_TRADE_THRESHOLD &&
-    Math.abs(result.delta) <= LARGE_TRADE_DELTA_TOLERANCE
-  );
+  return Math.round(total * EQUALITY_TOLERANCE_SHARE * 100) / 100;
+}
+
+export function isWithinEqualityTolerance(result: TradeCalculationResult): boolean {
+  return Math.abs(result.delta) <= equalityTolerance(result);
 }
 
 /** Предметы, публичная раздача которых запрещена п. 9.7. */
@@ -256,7 +258,7 @@ export function checkTradeRules(
     (sideA.length > 0 || result.side_a.coins > 0) &&
     (sideB.length > 0 || result.side_b.coins > 0) &&
     Math.abs(result.delta) > 0.005 &&
-    !isLargeTradeWithinTolerance(result)
+    !isWithinEqualityTolerance(result)
   ) {
     notices.push({
       id: 'unequal-exchange',
@@ -266,8 +268,8 @@ export function checkTradeRules(
       message:
         `Разница с учётом монет — ${formatPrice(Math.abs(result.delta))} монет. ` +
         'Доплата должна пройти в игре и подтверждаться логами сервера, иначе сделку могут ' +
-        'квалифицировать как неравноценный обмен (п. 9.10). Для сделок от 1 млн монет ' +
-        'допустима разница до 10 000 монет.',
+        'квалифицировать как неравноценный обмен (п. 9.10). Допустимая погрешность — 10% ' +
+        `от суммы сделки (${formatPrice(equalityTolerance(result))} монет).`,
       items: [],
     });
   }

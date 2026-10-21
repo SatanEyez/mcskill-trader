@@ -876,10 +876,18 @@ export async function fetchChatMessages(
   return response.data;
 }
 
-export async function sendChatMessage(roomId: string, message: string): Promise<ChatMessage> {
+export async function sendChatMessage(
+  roomId: string,
+  message: string,
+  imageUrl?: string | null,
+): Promise<ChatMessage> {
   const response = await request<{ data: ChatMessage }>(
     `/chat/rooms/${encodeURIComponent(roomId)}/messages`,
-    { method: 'POST', body: { message }, auth: true },
+    {
+      method: 'POST',
+      body: { message, image_url: imageUrl ?? null },
+      auth: true,
+    },
   );
   return response.data;
 }
