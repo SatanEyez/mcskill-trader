@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, Scale } from 'lucide-react';
 import clsx from 'clsx';
-import { formatPriceDots } from '../../lib/format';
+import { formatPriceDots, formatQuantityDots } from '../../lib/format';
 import { EQUALITY_TOLERANCE_SHARE, formatGapPercent } from '../../lib/trade-rules';
 import type { ExchangePlan } from '../../lib/exchange';
 import { AutoFitText } from '../ui/AutoFitText';
@@ -60,6 +60,14 @@ export function ExchangeSummary({ givenTotal, plan, className }: ExchangeSummary
             >
               {formatPriceDots(plan?.total ?? 0)}
             </AutoFitText>
+            {plan?.items[0] && (
+              <p
+                className="mt-0.5 truncate text-[10px] text-slate-500"
+                title={`${plan.items[0].resource.name} × ${formatQuantityDots(plan.items[0].quantity)}`}
+              >
+                {plan.items[0].resource.name} × {formatQuantityDots(plan.items[0].quantity)}
+              </p>
+            )}
           </dd>
         </div>
       </dl>
@@ -84,7 +92,7 @@ export function ExchangeSummary({ givenTotal, plan, className }: ExchangeSummary
           ) : (
             <Scale className="h-3 w-3" aria-hidden />
           )}
-          {plan ? (ok ? 'Минка к минке' : 'Вне допуска') : 'Нет набора'}
+          {plan ? (ok ? 'Минка к минке' : 'Вне допуска') : 'Нет варианта'}
         </span>
 
         <div className="mt-2.5 flex items-baseline justify-between gap-2">

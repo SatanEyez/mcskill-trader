@@ -9,8 +9,8 @@ import { ItemPickerModal } from '../components/trade/ItemPickerModal';
 import { PageLoader } from '../components/ui/Spinner';
 import { useCatalog } from '../hooks/useCatalog';
 import {
-  MAX_EXCHANGE_LINES,
-  MAX_EXCHANGE_LINE_QUANTITY,
+  EXCHANGE_OPTIONS_PER_PAGE,
+  MAX_EXCHANGE_QUANTITY,
   MAX_GIVE_QUANTITY,
   assembleExchange,
   clampGiveQuantity,
@@ -24,7 +24,8 @@ export function ExchangePage() {
 
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [variant, setVariant] = useState(0);
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -73,26 +74,36 @@ export function ExchangePage() {
   const result = useMemo(
     () =>
       given
-        ? assembleExchange(givenTotal, resources, { excludeId: given.id, variant })
+        ? assembleExchange(givenTotal, resources, { excludeId: given.id, page })
         : null,
-    [given, givenTotal, resources, variant],
+    [given, givenTotal, page, resources],
   );
+
+  // Каталог может обновиться, пока открыта страница: не оставляем выбор
+  // за пределами нового списка вариантов.
+  const selectedIndex = result?.options.length
+    ? Math.min(selected, result.options.length - 1)
+    : 0;
+  const activePlan = result?.options[selectedIndex] ?? null;
 
   const handleQuantityChange = useCallback((next: number) => {
     setQuantity(clampGiveQuantity(next));
-    // Другая сумма — другой набор: возвращаемся к самому точному варианту.
-    setVariant(0);
+    // Другая сумма — другие варианты: возвращаемся к первому и самому точному.
+    setPage(0);
+    setSelected(0);
   }, []);
 
   const handlePick = useCallback((resource: Resource) => {
     setResourceId(resource.id);
-    setVariant(0);
+    setPage(0);
+    setSelected(0);
     setPickerOpen(false);
   }, []);
 
   const handleClear = useCallback(() => {
     setResourceId(null);
-    setVariant(0);
+    setPage(0);
+    setSelected(0);
   }, []);
 
   const catalogEmpty = !loading && resources.length === 0;
@@ -117,10 +128,9 @@ export function ExchangePage() {
               Что попросить за свой стак
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-              Укажите предмет и количество, которое отдаёте, — набор на вторую сторону подберётся
-              сам по минимальным ценам: до {MAX_EXCHANGE_LINES} разных предметов по
-              1–{MAX_EXCHANGE_LINE_QUANTITY} штуки, чтобы суммы сошлись минка к минке с допуском
-              10%.
+              Укажите предмет и количество, которое отдаёте, — сайт подберёт {EXCHANGE_OPTIONS_PER_PAGE}{' '}
+              вариантов встречного предложения. В каждом варианте один предмет и количество от 1 до{' '}
+              {MAX_EXCHANGE_QUANTITY} штук: суммы сходятся минка к минке с допуском 10%.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2 text-[10px]">
@@ -130,7 +140,7 @@ export function ExchangePage() {
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.02] px-2.5 py-1 text-slate-400">
                 <Boxes className="h-3 w-3 text-accent" aria-hidden />
-                До {MAX_EXCHANGE_LINES} видов по 1–{MAX_EXCHANGE_LINE_QUANTITY} шт.
+                {EXCHANGE_OPTIONS_PER_PAGE} вариантов по 1–{MAX_EXCHANGE_QUANTITY} шт.
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.02] px-2.5 py-1 text-slate-400">
                 <Scale className="h-3 w-3 text-accent" aria-hidden />
@@ -166,7 +176,7 @@ export function ExchangePage() {
               </span>
               <h2 className="mt-4 text-base font-semibold text-white">Каталог пуст</h2>
               <p className="mt-2 max-w-sm text-sm text-slate-500">
-                Добавьте ресурсы в админ-панели — после этого обменник сможет подбирать наборы.
+                Добавьте ресурсы в админ-панели — после этого обменник сможет подбирать варианты.
               </p>
             </div>
           ) : (
@@ -202,23 +212,29 @@ export function ExchangePage() {
                 <ExchangeSummary
                   className="order-3 min-w-0 lg:order-2 lg:sticky lg:top-24"
                   givenTotal={givenTotal}
-                  plan={result?.plan ?? null}
+                  plan={activePlan}
                 />
 
                 <ReceivePanel
                   className="order-2 min-w-0 lg:order-3"
                   result={result}
                   hasGiven={Boolean(given)}
-                  onReroll={() => setVariant((current) => current + 1)}
+                  selected={selectedIndex}
+                  onSelect={setSelected}
+                  onReroll={() => {
+                    setPage((current) => current + 1);
+                    setSelected(0);
+                  }}
                 />
               </div>
 
               <p className="mt-5 flex items-start gap-2 text-[11px] leading-relaxed text-slate-600">
                 <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
-                Набор считается по минимальным ценам каталога: одна и та же сумма может собираться
-                несколькими способами — кнопка «Другой вариант» листает их. Предмет, который вы
-                отдаёте, в набор не попадает. Если ни один набор не уложился в 10%, сделка может
-                быть квалифицирована как неравноценный обмен (п. 9.10).
+                Каждый вариант — отдельный предмет и количество. Нажмите на карточку, чтобы
+                подставить её в «Итог», а «Другой вариант» покажет следующие{' '}
+                {EXCHANGE_OPTIONS_PER_PAGE}. Предмет, который вы отдаёте, в вариантах не участвует.
+                Если ни один вариант не уложился в 10%, сделка может быть квалифицирована как
+                неравноценный обмен (п. 9.10).
               </p>
 
               <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-100/85">
