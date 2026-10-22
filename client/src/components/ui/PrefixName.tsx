@@ -30,10 +30,10 @@ interface PrefixNameProps {
  * Обычная тема оставляет четыре искры-звёздочки, Новый год ставит снежинки
  * над текстом, Хэллоуин — маленьких летучих мышей по бокам.
  *
- * Декор стоит **в строке**, а не абсолютом: префикс часто живёт внутри
- * `<p class="truncate">` с `overflow: hidden`, и всё, что высунулось за
- * строку, там срезается. Поэтому снежинки подняты `vertical-align` — они
- * висят над текстом, но остаются внутри строки.
+ * Декор летает вокруг текста абсолютом. Чтобы его не срезало `overflow: hidden`
+ * у родителя (префикс часто живёт в `<p class="truncate">`), обёртка в сезонных
+ * темах получает вертикальные отступы — они расширяют строку и дают декору
+ * место над и под буквами.
  *
  * Без «shiny» — цветной текст без декора. С «shiny» — обёртка с переливающимся
  * текстом (`.prefix-shiny`) и декором вокруг. Цвет приходит в CSS-переменную
@@ -74,29 +74,37 @@ export function PrefixName({ prefix, className, suffix, title }: PrefixNameProps
       data-shiny="true"
       data-theme={theme}
     >
-      <PrefixOrnaments theme={theme} side="before" />
       <span className={clsx('prefix-shiny', className)}>{label}</span>
-      <PrefixOrnaments theme={theme} side="after" />
+      <PrefixOrnaments theme={theme} />
     </span>
   );
 }
 
 /**
  * Декор вокруг префикса. У каждой темы свой набор и своё поведение:
- * снежинки кружатся, мыши машут крыльями, искры вспыхивают.
+ * снежинки кружат над текстом, мыши летают вокруг и машут крыльями,
+ * искры вспыхивают.
  */
-function PrefixOrnaments({ theme, side }: { theme: SiteTheme; side: 'before' | 'after' }) {
+function PrefixOrnaments({ theme }: { theme: SiteTheme }) {
   if (theme === 'newyear') {
-    return <SnowflakeIcon className={`prefix-flake prefix-flake-${side}`} />;
+    return (
+      <>
+        <SnowflakeIcon className="prefix-flake prefix-flake-1" />
+        <SnowflakeIcon className="prefix-flake prefix-flake-2" />
+        <SnowflakeIcon className="prefix-flake prefix-flake-3" />
+      </>
+    );
   }
 
   if (theme === 'halloween') {
-    return <BatIcon className={`prefix-bat prefix-bat-${side}`} />;
+    return (
+      <>
+        <BatIcon className="prefix-bat prefix-bat-1" />
+        <BatIcon className="prefix-bat prefix-bat-2" />
+        <BatIcon className="prefix-bat prefix-bat-3" />
+      </>
+    );
   }
-
-  // Искры — только у обычной темы и только справа от текста: они позиционируются
-  // абсолютом вокруг названия и в строку не вмешиваются.
-  if (side === 'before') return null;
 
   return (
     <>
