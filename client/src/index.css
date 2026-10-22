@@ -1219,9 +1219,16 @@ html.newyear header a[aria-current='page']::after {
 }
 
 /* ── Префиксы под тему ───────────────────────────────────────
- * Цвет префикса считает `themePrefixColor` (lib/theme.ts) и отдаёт уже
- * смешанным, поэтому здесь только свечение и характер искр. У «shiny»
- * буквы прозрачные, тень по глифам всё равно рисуется — свечение читается.
+ * `themePrefixColor` (lib/theme.ts) отдаёт уже подмешанный цвет, но одной
+ * подмешки мало: у золотого #F5C542 она даёт #edd586 — тот же жёлтый, только
+ * бледнее, и на глаз «ничего не изменилось». Поэтому сезонный цвет живёт
+ * ещё и в самом градиенте блеска: в покое текст стоит в «заиндевевшем»
+ * (зимой) или «раскалённом» (хэллоуин) варианте своего цвета, а по нему
+ * проходит полоса чистого льда или углей. Свечение постоянное — именно оно
+ * читается как сезон, когда блеск ушёл с текста.
+ *
+ * У «shiny» буквы прозрачные, но тень и drop-shadow рисуются по глифам,
+ * поэтому свечение видно.
  */
 
 .prefix-name {
@@ -1230,12 +1237,16 @@ html.newyear header a[aria-current='page']::after {
 
 html.newyear .prefix-name,
 html.newyear .prefix-shiny {
-  text-shadow: 0 0 14px rgba(186, 230, 253, 0.45);
+  text-shadow:
+    0 0 10px rgba(125, 211, 252, 0.85),
+    0 0 24px rgba(56, 189, 248, 0.45);
 }
 
 html.halloween .prefix-name,
 html.halloween .prefix-shiny {
-  text-shadow: 0 0 12px rgba(251, 146, 60, 0.4);
+  text-shadow:
+    0 0 10px rgba(251, 146, 60, 0.85),
+    0 0 24px rgba(234, 88, 12, 0.45);
 }
 
 /* Зимой блеск идёт медленнее — как иней, а не как искра. */
@@ -1243,14 +1254,76 @@ html.newyear .prefix-shiny {
   animation-duration: 7s;
 }
 
+/*
+ * Сезонный цвет занимает почти всю плитку, исходный цвет префикса остаётся
+ * лёгкой примесью по краям, белый — узким бликом в середине. Плитка вдвое
+ * шире текста, поэтому окно текста всегда лежит внутри сезонной зоны и
+ * префикс выглядит по-сезонному в любой момент анимации.
+ *
+ * Цвета подобраны по контрасту, а не по «похожести»: с золотым #F5C542 любая
+ * оранжевая подмешка даёт то же золото, поэтому на хэллоуин в блеск идёт
+ * фиолетовый (вторая краска праздника), а оранжевым светится свечение.
+ */
+@supports (color: color-mix(in srgb, white, black)) {
+  html.newyear .prefix-shiny {
+    background-image: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--prefix-shiny-color, #f5c542) 18%, #38bdf8) 0%,
+      #38bdf8 12%,
+      #7dd3fc 30%,
+      #e0f2fe 44%,
+      #ffffff 50%,
+      #e0f2fe 56%,
+      #7dd3fc 70%,
+      #38bdf8 88%,
+      color-mix(in srgb, var(--prefix-shiny-color, #f5c542) 18%, #38bdf8) 100%
+    );
+  }
+
+  html.halloween .prefix-shiny {
+    background-image: linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--prefix-shiny-color, #f5c542) 20%, #a855f7) 0%,
+      #a855f7 12%,
+      #c084fc 30%,
+      #f5f3ff 44%,
+      #fdba74 50%,
+      #f5f3ff 56%,
+      #c084fc 70%,
+      #a855f7 88%,
+      color-mix(in srgb, var(--prefix-shiny-color, #f5c542) 20%, #a855f7) 100%
+    );
+  }
+}
+
+/*
+ * Зимой искры — шестилучевые снежинки и мерцают редко; на хэллоуин остаются
+ * четырёхлучевыми угольками, но вспыхивают вдвое чаще.
+ */
 html.newyear .prefix-spark {
   --prefix-spark-color: #e0f2fe;
-  filter: drop-shadow(0 0 0.2em #bae6fd);
+  clip-path: polygon(
+    50% 0%,
+    58% 34%,
+    84% 18%,
+    62% 46%,
+    90% 62%,
+    58% 58%,
+    50% 100%,
+    42% 58%,
+    10% 62%,
+    38% 46%,
+    16% 18%,
+    42% 34%
+  );
+  filter: drop-shadow(0 0 0.24em #bae6fd);
+  animation-duration: 5.4s;
 }
 
 html.halloween .prefix-spark {
   --prefix-spark-color: #fdba74;
-  filter: drop-shadow(0 0 0.18em #fb923c);
+  filter: drop-shadow(0 0 0.2em #fb923c);
+  animation-duration: 2.6s;
 }
 
 @keyframes newyear-snowfall {

@@ -23,10 +23,10 @@ interface PrefixNameProps {
 /**
  * Название префикса администратора.
  *
- * Цвет зависит от активной темы сайта: обычная тема оставляет цвет как есть,
- * хэллоуин подмешивает тыквенный оранжевый, новый год — ледяной голубой
- * (`themePrefixColor`). Так сезонное оформление автоматически подхватывает
- * и префиксы, без ручной правки каждого.
+ * Цвет зависит от активной темы сайта. У «shiny» сезонный оттенок живёт в CSS
+ * (`html.newyear` / `html.halloween` перекрашивают сам градиент блеска), поэтому
+ * сюда приходит исходный цвет — так он не смешивается дважды. У обычного
+ * префикса цвет считает `themePrefixColor`.
  *
  * Без «shiny» — цветной текст. С «shiny» — обёртка с переливающимся текстом
  * (`.prefix-shiny`) и четырьмя искрами вокруг него. Цвет приходит в CSS-переменную
@@ -37,7 +37,6 @@ interface PrefixNameProps {
  */
 export function PrefixName({ prefix, className, suffix, title }: PrefixNameProps) {
   const { theme } = useSiteSettings();
-  const color = themePrefixColor(prefix.color, theme);
   const themeClass = theme === 'default' ? null : `prefix-theme-${theme}`;
 
   const label = (
@@ -51,7 +50,7 @@ export function PrefixName({ prefix, className, suffix, title }: PrefixNameProps
     return (
       <span
         className={clsx('prefix-name', themeClass, className)}
-        style={{ color }}
+        style={{ color: themePrefixColor(prefix.color, theme) }}
         title={title}
         data-theme={theme}
       >
@@ -60,10 +59,16 @@ export function PrefixName({ prefix, className, suffix, title }: PrefixNameProps
     );
   }
 
+  /*
+   * У «shiny» цвет отдаём как есть, без подмешки: сезонный оттенок считает CSS
+   * (`color-mix` в градиенте). Если подмешать здесь и там, цвет смешивается
+   * дважды и всё превращается в белёсую кашу — именно так «незаметная» смена
+   * темы и получалась.
+   */
   return (
     <span
       className={clsx('prefix-shiny-wrap', themeClass)}
-      style={{ '--prefix-shiny-color': color } as CSSProperties}
+      style={{ '--prefix-shiny-color': prefix.color } as CSSProperties}
       title={title}
       data-shiny="true"
       data-theme={theme}
