@@ -156,7 +156,7 @@
    * Градиент в два раза шире текста и повторяется (background-repeat: repeat):
    * без повтора за краем картинки буквы остаются прозрачными и «пропадают».
    * Ширина плитки 2W, а ход анимации — ровно две плитки, поэтому цикл
-   * замыкается без рывка, а полоса проходит по тексту раз в 3 секунды.
+   * замыкается без рывка, а полоса проходит по тексту раз в 2,5 секунды.
    */
   /*
    * Переменные живут на обёртке, а не на тексте: объявленные на самом
@@ -176,8 +176,8 @@
   @supports (color: color-mix(in srgb, white, black)) {
     .prefix-shiny-wrap {
       /* Светлая версия цвета префикса: у каждого цвета свой оттенок блеска. */
-      --prefix-shiny-sheen: color-mix(in srgb, var(--prefix-shiny-color) 40%, #ffffff);
-      --prefix-spark-color: color-mix(in srgb, var(--prefix-shiny-color) 62%, #ffffff);
+      --prefix-shiny-sheen: color-mix(in srgb, var(--prefix-shiny-color) 52%, #ffffff);
+      --prefix-spark-color: color-mix(in srgb, var(--prefix-shiny-color) 70%, #ffffff);
     }
   }
 
@@ -185,11 +185,11 @@
     background-image: linear-gradient(
       100deg,
       var(--prefix-shiny-color, #f5c542) 0%,
-      var(--prefix-shiny-color, #f5c542) 42%,
-      var(--prefix-shiny-sheen, #ffffff) 48%,
+      var(--prefix-shiny-color, #f5c542) 36%,
+      var(--prefix-shiny-sheen, #ffffff) 44%,
       #ffffff 50%,
-      var(--prefix-shiny-sheen, #ffffff) 52%,
-      var(--prefix-shiny-color, #f5c542) 58%,
+      var(--prefix-shiny-sheen, #ffffff) 56%,
+      var(--prefix-shiny-color, #f5c542) 64%,
       var(--prefix-shiny-color, #f5c542) 100%
     );
     background-repeat: repeat;
@@ -199,7 +199,7 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
-    animation: prefix-shimmer 6s linear infinite;
+    animation: prefix-shimmer 5s linear infinite;
   }
 
   /*
@@ -254,6 +254,14 @@
     width: max(3px, 0.32em);
     height: max(3px, 0.32em);
     animation-delay: 2.35s;
+  }
+
+  .prefix-spark-4 {
+    bottom: -0.16em;
+    left: 1%;
+    width: max(3px, 0.26em);
+    height: max(3px, 0.26em);
+    animation-delay: 2.95s;
   }
 
   .animate-delay-100 {

@@ -22,7 +22,7 @@ interface PrefixNameProps {
  * Название префикса администратора.
  *
  * Без «shiny» — обычный цветной текст. С «shiny» — обёртка с переливающимся
- * текстом (`.prefix-shiny`) и тремя искрами вокруг него. Цвет приходит
+ * текстом (`.prefix-shiny`) и четырьмя искрами вокруг него. Цвет приходит
  * в CSS-переменную `--prefix-shiny-color`, а не в `color`: эффект делает буквы
  * прозрачными и рисует градиент внутри них, поэтому `currentColor` в градиенте
  * оказался бы тоже прозрачным. От этой же переменной CSS считает оттенок
@@ -55,6 +55,7 @@ export function PrefixName({ prefix, className, suffix, title }: PrefixNameProps
       <span className="prefix-spark prefix-spark-1" aria-hidden />
       <span className="prefix-spark prefix-spark-2" aria-hidden />
       <span className="prefix-spark prefix-spark-3" aria-hidden />
+      <span className="prefix-spark prefix-spark-4" aria-hidden />
     </span>
   );
 }

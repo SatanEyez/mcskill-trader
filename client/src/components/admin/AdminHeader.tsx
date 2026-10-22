@@ -32,7 +32,7 @@ export function AdminHeader() {
           {user && (
             <Link
               to="/admin/profile"
-              title="Профиль: аватар, префикс и пароль"
+              aria-label={`Профиль: ${user.login}`}
               className="group flex max-w-[16rem] items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.015] py-1.5 pl-1.5 pr-2.5 transition hover:border-accent/35 hover:from-accent/[0.10] hover:to-white/[0.02]"
             >
               <AdminAvatar
