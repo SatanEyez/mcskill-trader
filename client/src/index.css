@@ -117,6 +117,41 @@
     image-rendering: pixelated;
   }
 
+  /* Ползунок количества в «Обменнике»: 1–64 штуки. */
+  .range-slider {
+    @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 outline-none;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 999px;
+    background: #34d399;
+    border: 2px solid #04110c;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+
+  .range-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+  }
+
+  .range-slider::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 999px;
+    background: #34d399;
+    border: 2px solid #04110c;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
+    cursor: pointer;
+  }
+
+  .range-slider:focus-visible {
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
     -ms-overflow-style: none;

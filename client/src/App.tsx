@@ -6,6 +6,7 @@ import { ToastProvider } from './context/ToastContext';
 import { HomePage } from './pages/HomePage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { TradePage } from './pages/TradePage';
+import { ExchangePage } from './pages/ExchangePage';
 import { ReportPage } from './pages/ReportPage';
 import { NewsPage } from './pages/NewsPage';
 import { NewsPostPage } from './pages/NewsPostPage';
@@ -149,6 +150,7 @@ export function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/trade" element={<TradePage />} />
+            <Route path="/exchange" element={<ExchangePage />} />
             <Route path="/report" element={<ReportPage />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/news/:id" element={<NewsPostPage />} />

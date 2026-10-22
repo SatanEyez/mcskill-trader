@@ -33,6 +33,11 @@ export function Footer() {
                   </Link>
                 </li>
                 <li>
+                  <Link to="/exchange" className="transition hover:text-accent">
+                    Обменник
+                  </Link>
+                </li>
+                <li>
                   <Link to="/report" className="transition hover:text-accent">
                     Сообщить о проблеме
                   </Link>

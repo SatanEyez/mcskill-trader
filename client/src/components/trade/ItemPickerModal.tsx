@@ -16,6 +16,8 @@ interface ItemPickerModalProps {
   selectedIds: string[];
   onPick: (resource: Resource) => void;
   onClose: () => void;
+  /** Одиночный выбор: в «Обменнике» предмет всего один, счётчик не нужен. */
+  single?: boolean;
 }
 
 export function ItemPickerModal({
@@ -25,6 +27,7 @@ export function ItemPickerModal({
   selectedIds,
   onPick,
   onClose,
+  single = false,
 }: ItemPickerModalProps) {
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState<string>('all');
@@ -36,7 +39,7 @@ export function ItemPickerModal({
   }, [open]);
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const atLimit = selectedIds.length >= MAX_TRADE_LINES;
+  const atLimit = !single && selectedIds.length >= MAX_TRADE_LINES;
 
   const categories = useMemo(() => {
     const map = new Map<string, string>();
@@ -84,14 +87,21 @@ export function ItemPickerModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Добавить предмет"
-      description={`Сторона «${sideTitle}». Нажмите на предмет, чтобы добавить его, и ещё раз — чтобы убрать.`}
+      title={single ? 'Выбрать предмет' : 'Добавить предмет'}
+      description={
+        single
+          ? `Сторона «${sideTitle}». Нажмите на предмет — он заменит текущий выбор.`
+          : `Сторона «${sideTitle}». Нажмите на предмет, чтобы добавить его, и ещё раз — чтобы убрать.`
+      }
       size="lg"
       footer={
         <>
           <span className="mr-auto self-center text-[11px] text-slate-500">
-            Выбрано {selectedIds.length} из {MAX_TRADE_LINES}
-            {atLimit && ' · достигнут лимит'}
+            {single
+              ? selectedIds.length > 0
+                ? 'Предмет выбран'
+                : 'Предмет не выбран'
+              : `Выбрано ${selectedIds.length} из ${MAX_TRADE_LINES}${atLimit ? ' · достигнут лимит' : ''}`}
           </span>
           <button type="button" onClick={onClose} className="btn btn-primary">
             Готово
@@ -176,7 +186,9 @@ export function ItemPickerModal({
                       disabled
                         ? `Лимит ${MAX_TRADE_LINES} предметов на сторону`
                         : inSide
-                          ? 'Убрать предмет из сделки'
+                          ? single
+                            ? 'Этот предмет уже выбран'
+                            : 'Убрать предмет из сделки'
                           : 'Добавить предмет'
                     }
                     aria-pressed={inSide}

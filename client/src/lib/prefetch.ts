@@ -48,6 +48,7 @@ const ROUTE_LOADERS: Record<string, Loader[]> = {
       ),
   ],
   '/trade': [() => prefetch(QK.catalog, fetchCatalog)],
+  '/exchange': [() => prefetch(QK.catalog, fetchCatalog)],
   '/news': [
     () => prefetch(QK.news(PUBLIC_NEWS.limit, PUBLIC_NEWS.offset), () => fetchNews(PUBLIC_NEWS)),
   ],

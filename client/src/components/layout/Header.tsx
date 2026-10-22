@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ArrowLeftRight,
   Boxes,
   Calculator,
   LockKeyhole,
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { to: '/news', label: 'Новости', icon: Newspaper },
   { to: '/report', label: 'Репорт', icon: MessageSquareWarning },
   { to: '/trade', label: 'Трейд-калькулятор', icon: Calculator },
+  { to: '/exchange', label: 'Обменник', icon: ArrowLeftRight },
 ] as const;
 
 export function Header() {
