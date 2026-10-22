@@ -90,7 +90,7 @@ export interface ChatMessage {
   user_login: string;
   avatar_url: string | null;
   /** Префикс (должность) автора на момент сообщения. */
-  user_prefix: { name: string; color: string } | null;
+  user_prefix: { name: string; color: string; is_shiny: boolean } | null;
   /** Прикреплённое фото (`/uploads/...`) или null. */
   image_url: string | null;
   message: string;
@@ -119,6 +119,8 @@ export interface AdminPrefix {
   id: string;
   name: string;
   color: string;
+  /** «Shiny»-эффект: по тексту префикса бежит светлая полоса. */
+  is_shiny: boolean;
 }
 
 export interface AdminUser {
@@ -292,6 +294,8 @@ export interface AdminPrefixInfo {
   name: string;
   color: string;
   priority: number;
+  /** Включён «shiny»-эффект (переливающийся блеск по тексту). */
+  is_shiny: boolean;
   is_system: boolean;
   user_count: number;
   created_at: string;

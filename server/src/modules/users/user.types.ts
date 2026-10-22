@@ -5,6 +5,8 @@ export interface AdminPrefixDto {
   id: string;
   name: string;
   color: string;
+  /** «Shiny»-эффект: по тексту бежит светлая полоса. */
+  is_shiny: boolean;
 }
 
 export interface AdminRoleDto {
@@ -97,6 +99,7 @@ export interface SessionUser {
   prefix_id: string | null;
   prefix_name: string | null;
   prefix_color: string | null;
+  prefix_is_shiny: boolean | number | null;
   is_system: boolean;
 }
 

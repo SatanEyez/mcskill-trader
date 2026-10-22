@@ -20,6 +20,7 @@ import { AdminTabs } from '../components/admin/AdminTabs';
 import { RoleFormModal } from '../components/admin/RoleFormModal';
 import { PrefixFormModal } from '../components/admin/PrefixFormModal';
 import { Modal } from '../components/ui/Modal';
+import { PrefixName } from '../components/ui/PrefixName';
 import { PageLoader, Spinner } from '../components/ui/Spinner';
 
 type ConfirmTarget = { type: 'role'; item: AdminRoleInfo } | { type: 'prefix'; item: AdminPrefixInfo };
@@ -313,9 +314,18 @@ export function AdminAccessPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold" style={{ color: prefix.color }}>
-                          {prefix.name}
+                        <h3 className="truncate text-sm font-semibold">
+                          <PrefixName prefix={prefix} />
                         </h3>
+                        {prefix.is_shiny && (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/30 bg-amber-300/[0.08] px-1.5 py-0.5 text-[8px] uppercase tracking-wider text-amber-200"
+                            title="Включён эффект блеска"
+                          >
+                            <Sparkles className="h-2.5 w-2.5" aria-hidden />
+                            shiny
+                          </span>
+                        )}
                         {prefix.is_system && (
                           <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-[8px] uppercase tracking-wider text-slate-500">
                             system

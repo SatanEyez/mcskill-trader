@@ -29,6 +29,8 @@ export interface PrefixDto {
   name: string;
   color: string;
   priority: number;
+  /** Включён «shiny»-эффект: по тексту префикса бежит светлая полоса. */
+  is_shiny: boolean;
   is_system: boolean;
   user_count: number;
   created_at: string;
@@ -53,6 +55,7 @@ interface PrefixRow {
   name: string;
   color: string;
   priority: number | string;
+  is_shiny: boolean | number;
   is_system: boolean | number;
   user_count?: number | string;
   created_at: Date | string;
@@ -80,6 +83,7 @@ function toPrefixDto(row: PrefixRow): PrefixDto {
     name: row.name,
     color: row.color,
     priority: Number(row.priority ?? 0),
+    is_shiny: Boolean(row.is_shiny),
     is_system: Boolean(row.is_system),
     user_count: Number(row.user_count ?? 0),
     created_at: toIso(row.created_at),
@@ -96,7 +100,7 @@ const ROLE_SELECT = `
 `;
 
 const PREFIX_SELECT = `
-  SELECT p.id, p.name, p.color, p.priority, p.is_system,
+  SELECT p.id, p.name, p.color, p.priority, p.is_shiny, p.is_system,
          p.created_at, p.updated_at,
          (SELECT COUNT(*) FROM admin_users AS u
            WHERE u.prefix_id = p.id AND u.is_system = FALSE) AS user_count
@@ -248,9 +252,9 @@ export async function createPrefix(input: CreatePrefixInput): Promise<PrefixDto>
 
   const id = randomUUID();
   await db.query(
-    `INSERT INTO admin_prefixes (id, name, color, priority, is_system)
-     VALUES (?, ?, ?, ?, FALSE)`,
-    [id, input.name, input.color, input.priority],
+    `INSERT INTO admin_prefixes (id, name, color, priority, is_shiny, is_system)
+     VALUES (?, ?, ?, ?, ?, FALSE)`,
+    [id, input.name, input.color, input.priority, input.is_shiny],
   );
 
   return getPrefixById(id);
@@ -284,12 +288,14 @@ export async function updatePrefix(
         SET name = ?,
             color = ?,
             priority = ?,
+            is_shiny = ?,
             updated_at = CURRENT_TIMESTAMP(3)
       WHERE id = ?`,
     [
       input.name ?? previous.name,
       input.color ?? previous.color,
       input.priority ?? previous.priority,
+      input.is_shiny ?? previous.is_shiny,
       id,
     ],
   );

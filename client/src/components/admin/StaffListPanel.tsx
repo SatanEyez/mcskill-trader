@@ -12,6 +12,7 @@ import {
 import clsx from 'clsx';
 import { formatDateTimeMsk, formatDuration, pluralize } from '../../lib/format';
 import type { AdminRole, AdminStaffMeta, AdminUser } from '../../types';
+import { PrefixName } from '../ui/PrefixName';
 
 interface StaffListPanelProps {
   staff: AdminUser[];
@@ -217,7 +218,12 @@ export function StaffListPanel({
                           className="truncate text-sm font-semibold"
                           style={{ color: member.prefix?.color ?? '#E2E8F0' }}
                         >
-                          {member.prefix ? `${member.prefix.name} · ` : ''}
+                          {member.prefix && (
+                            <>
+                              <PrefixName prefix={member.prefix} />
+                              {' · '}
+                            </>
+                          )}
                           {member.login}
                         </p>
 

@@ -554,6 +554,7 @@ export async function createPrefix(input: {
   name: string;
   color: string;
   priority: number;
+  is_shiny?: boolean;
 }): Promise<AdminPrefixInfo> {
   const response = await request<{ data: AdminPrefixInfo }>('/prefixes', {
     method: 'POST',
@@ -565,7 +566,7 @@ export async function createPrefix(input: {
 
 export async function updatePrefix(
   id: string,
-  input: { name?: string; color?: string; priority?: number },
+  input: { name?: string; color?: string; priority?: number; is_shiny?: boolean },
 ): Promise<AdminPrefixInfo> {
   const response = await request<{ data: AdminPrefixInfo }>(
     `/prefixes/${encodeURIComponent(id)}`,

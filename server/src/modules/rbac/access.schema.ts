@@ -70,11 +70,19 @@ const prefixColorField = z
   .regex(/^#[0-9a-fA-F]{6}$/, 'Цвет должен быть в формате #RRGGBB')
   .transform((value) => value.toUpperCase());
 
+/**
+ * «Shiny»-эффект: по тексту префикса пробегает светлая полоса.
+ * Принимаем только настоящий boolean — строка «false» из формы не должна
+ * включать эффект.
+ */
+const prefixShinyField = z.boolean();
+
 export const createPrefixSchema = z
   .object({
     name: prefixNameField,
     color: prefixColorField,
     priority: z.coerce.number().int().min(-100).max(100).optional().default(0),
+    is_shiny: prefixShinyField.optional().default(false),
   })
   .strict();
 
@@ -83,6 +91,7 @@ export const updatePrefixSchema = z
     name: prefixNameField.optional(),
     color: prefixColorField.optional(),
     priority: z.coerce.number().int().min(-100).max(100).optional(),
+    is_shiny: prefixShinyField.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

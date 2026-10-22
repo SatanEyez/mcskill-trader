@@ -56,7 +56,12 @@ export const requireAdmin: RequestHandler = asyncHandler(async (req, _res, next)
     role_name: user.role_name,
     prefix:
       user.prefix_id && user.prefix_name && user.prefix_color
-        ? { id: user.prefix_id, name: user.prefix_name, color: user.prefix_color }
+        ? {
+            id: user.prefix_id,
+            name: user.prefix_name,
+            color: user.prefix_color,
+            is_shiny: Boolean(user.prefix_is_shiny),
+          }
         : null,
   };
 

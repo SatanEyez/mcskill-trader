@@ -27,6 +27,7 @@ import { ChangeRoleDialog } from '../components/admin/ChangeRoleDialog';
 import { DeleteUserDialog } from '../components/admin/DeleteUserDialog';
 import { StaffListPanel } from '../components/admin/StaffListPanel';
 import { UserAccessDialog } from '../components/admin/UserAccessDialog';
+import { PrefixName } from '../components/ui/PrefixName';
 import { PageLoader } from '../components/ui/Spinner';
 
 type UsersView = 'accounts' | 'staff';
@@ -532,7 +533,12 @@ export function AdminUsersPage() {
                             className="truncate text-sm font-semibold"
                             style={{ color: target.prefix?.color ?? '#E2E8F0' }}
                           >
-                            {target.prefix ? `${target.prefix.name} · ` : ''}
+                            {target.prefix && (
+                              <>
+                                <PrefixName prefix={target.prefix} />
+                                {' · '}
+                              </>
+                            )}
                             {target.login}
                           </p>
                           {target.role === 'owner' && (

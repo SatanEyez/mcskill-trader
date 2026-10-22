@@ -1,6 +1,7 @@
 import { ChevronRight, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { PrefixName } from '../ui/PrefixName';
 import { Logo } from '../layout/Logo';
 import { AdminAvatar } from './AdminAvatar';
 
@@ -54,7 +55,7 @@ export function AdminHeader() {
                         backgroundColor: `${prefixColor}1f`,
                       }}
                     >
-                      {user.prefix.name}
+                      <PrefixName prefix={user.prefix} />
                     </span>
                   )}
                   <span className="truncate text-xs font-semibold text-white">{user.login}</span>

@@ -84,7 +84,7 @@ export const createPrefix: RequestHandler = asyncHandler(async (req, res) => {
     entityType: 'prefix',
     entityId: data.id,
     entityLabel: data.name,
-    details: { color: data.color, priority: data.priority },
+    details: { color: data.color, priority: data.priority, is_shiny: data.is_shiny },
   });
 
   res.status(201).json({ data });
@@ -105,6 +105,7 @@ export const updatePrefix: RequestHandler = asyncHandler(async (req, res) => {
       name: { from: previous.name, to: data.name },
       color: { from: previous.color, to: data.color },
       priority: { from: previous.priority, to: data.priority },
+      is_shiny: { from: previous.is_shiny, to: data.is_shiny },
     },
   });
 

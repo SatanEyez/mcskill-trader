@@ -24,6 +24,7 @@ type UserRowWithRelations = AdminUserBaseRow & {
   role_access_level: number | string | null;
   prefix_name: string | null;
   prefix_color: string | null;
+  prefix_is_shiny: boolean | number | null;
   is_online: boolean | number;
 };
 
@@ -55,7 +56,8 @@ const USER_SELECT = `
          r.permissions AS role_permissions,
          r.access_level AS role_access_level,
          p.name AS prefix_name,
-         p.color AS prefix_color
+         p.color AS prefix_color,
+         p.is_shiny AS prefix_is_shiny
     FROM admin_users AS u
     LEFT JOIN admin_users AS reviewer ON reviewer.id = u.reviewed_by
     LEFT JOIN admin_roles AS r ON r.id = u.role_id
@@ -75,7 +77,12 @@ function toDto(row: UserRowWithRelations): AdminUserDto {
     permissions: normalizePermissions(row.role_permissions),
     prefix:
       row.prefix_id && row.prefix_name && row.prefix_color
-        ? { id: row.prefix_id, name: row.prefix_name, color: row.prefix_color }
+        ? {
+            id: row.prefix_id,
+            name: row.prefix_name,
+            color: row.prefix_color,
+            is_shiny: Boolean(row.prefix_is_shiny),
+          }
         : null,
     is_system: Boolean(row.is_system),
     discord: row.discord,
@@ -111,7 +118,8 @@ export async function findSessionUser(id: string): Promise<SessionUser | null> {
             r.name AS role_name,
             r.permissions,
             p.name AS prefix_name,
-            p.color AS prefix_color
+            p.color AS prefix_color,
+            p.is_shiny AS prefix_is_shiny
        FROM admin_users AS u
        LEFT JOIN admin_roles AS r ON r.id = u.role_id
        LEFT JOIN admin_prefixes AS p ON p.id = u.prefix_id

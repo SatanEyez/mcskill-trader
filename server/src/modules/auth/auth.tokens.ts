@@ -8,6 +8,8 @@ export interface AdminPrefixDto {
   id: string;
   name: string;
   color: string;
+  /** «Shiny»-эффект: по тексту бежит светлая полоса. */
+  is_shiny: boolean;
 }
 
 /**

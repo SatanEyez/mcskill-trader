@@ -93,7 +93,11 @@ function toMessageDto(row: ChatMessageRow, hidePrefix = false): ChatMessageDto {
     avatar_url: row.avatar_url ?? null,
     user_prefix:
       !hidePrefix && row.prefix_name && row.prefix_color
-        ? { name: row.prefix_name, color: row.prefix_color }
+        ? {
+            name: row.prefix_name,
+            color: row.prefix_color,
+            is_shiny: Boolean(row.prefix_is_shiny),
+          }
         : null,
     image_url: row.image_url ?? null,
     message: row.message,
@@ -110,6 +114,7 @@ const MESSAGE_SELECT = `
          u.avatar_url,
          p.name AS prefix_name,
          p.color AS prefix_color,
+         p.is_shiny AS prefix_is_shiny,
          m.message,
          m.created_at
     FROM chat_messages AS m

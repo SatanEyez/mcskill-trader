@@ -26,6 +26,7 @@ import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { Modal } from '../components/ui/Modal';
+import { PrefixName } from '../components/ui/PrefixName';
 import { Spinner } from '../components/ui/Spinner';
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
@@ -81,7 +82,7 @@ function MessageBubble({
               }}
               title={`Префикс: ${prefix.name}`}
             >
-              {prefix.name}
+              <PrefixName prefix={prefix} />
             </span>
           )}
           <span className="font-medium text-slate-400">{message.user_login}</span>

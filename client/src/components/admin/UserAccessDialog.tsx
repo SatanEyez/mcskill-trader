@@ -3,6 +3,7 @@ import { Save, ShieldCheck, Sparkles } from 'lucide-react';
 import { ApiError, fetchPrefixes, fetchRoles, updateUserAccess } from '../../lib/api';
 import type { AdminPrefixInfo, AdminRoleInfo, AdminUser } from '../../types';
 import { Modal } from '../ui/Modal';
+import { PrefixName } from '../ui/PrefixName';
 import { Spinner } from '../ui/Spinner';
 
 interface UserAccessDialogProps {
@@ -188,8 +189,8 @@ export function UserAccessDialog({ user, onClose, onUpdated, selfMode = false }:
           {selectedPrefix && (
             <div className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3">
               <Sparkles className="h-4 w-4" style={{ color: selectedPrefix.color }} aria-hidden />
-              <span className="text-sm font-semibold" style={{ color: selectedPrefix.color }}>
-                {selectedPrefix.name}
+              <span className="text-sm font-semibold">
+                <PrefixName prefix={selectedPrefix} />
               </span>
               <span className="text-xs text-slate-500">· {user?.login}</span>
             </div>

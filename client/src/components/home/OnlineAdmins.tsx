@@ -1,6 +1,7 @@
 import { ShieldCheck, UsersRound } from 'lucide-react';
 import { useOnlineAdmins } from '../../hooks/useOnlineAdmins';
 import { pluralize } from '../../lib/format';
+import { PrefixName } from '../ui/PrefixName';
 import { Spinner } from '../ui/Spinner';
 import { AdminAvatar } from '../admin/AdminAvatar';
 
@@ -73,7 +74,12 @@ export function OnlineAdmins() {
                       style={{ color }}
                       title={admin.login}
                     >
-                      {admin.prefix ? `${admin.prefix.name} · ` : ''}
+                      {admin.prefix && (
+                        <>
+                          <PrefixName prefix={admin.prefix} />
+                          {' · '}
+                        </>
+                      )}
                       {admin.login}
                     </span>
                     <span className="block truncate text-xs text-slate-500">

@@ -20,6 +20,7 @@ import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminAvatar } from '../components/admin/AdminAvatar';
 import { AdminTabs } from '../components/admin/AdminTabs';
 import { ChangePasswordModal } from '../components/admin/ChangePasswordModal';
+import { PrefixName } from '../components/ui/PrefixName';
 import { Spinner } from '../components/ui/Spinner';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -266,7 +267,7 @@ export function AdminProfilePage() {
                 <dt className="text-slate-500">Префикс</dt>
                 <dd className="text-right">
                   <span className="font-medium" style={{ color: prefixColor }}>
-                    {user.prefix?.name ?? 'нет'}
+                    {user.prefix ? <PrefixName prefix={user.prefix} /> : 'нет'}
                   </span>
                   <AssignedBy
                     login={user.prefix_assigned_by_login}

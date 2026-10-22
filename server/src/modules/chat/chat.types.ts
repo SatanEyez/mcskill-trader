@@ -52,6 +52,7 @@ export interface ChatMessageRow {
   avatar_url: string | null;
   prefix_name: string | null;
   prefix_color: string | null;
+  prefix_is_shiny: boolean | number | null;
   image_url: string | null;
   message: string;
   created_at: Date | string;
@@ -64,7 +65,7 @@ export interface ChatMessageDto {
   user_login: string;
   avatar_url: string | null;
   /** Префикс (должность) автора на момент сообщения. */
-  user_prefix: { name: string; color: string } | null;
+  user_prefix: { name: string; color: string; is_shiny: boolean } | null;
   /** Ссылка на прикреплённое изображение (`/uploads/...`). */
   image_url: string | null;
   message: string;

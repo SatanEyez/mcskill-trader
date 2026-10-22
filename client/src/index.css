@@ -144,6 +144,43 @@
     @apply bg-gradient-to-r from-accent-300 via-emerald-200 to-cyan-300 bg-clip-text text-transparent;
   }
 
+  /*
+   * «Shiny»-префикс: по тексту медленно пробегает тонкая светлая полоса —
+   * как блеск у покемонов в Pixelmon.
+   *
+   * Цвет буквы приходит из React в --prefix-shiny-color: currentColor здесь
+   * не годится, потому что text-fill-color: transparent делает прозрачным
+   * и его тоже.
+   *
+   * Градиент в два раза шире текста и повторяется (background-repeat: repeat):
+   * без повтора за краем картинки буквы остаются прозрачными и «пропадают».
+   * Ширина плитки 2W, а ход анимации — ровно две плитки, поэтому цикл
+   * замыкается без рывка, а полоса проходит по тексту раз в 4 секунды.
+   */
+  .prefix-shiny {
+    --prefix-shiny-color: #f5c542;
+    --prefix-shiny-sheen: #fff6d5;
+
+    background-image: linear-gradient(
+      100deg,
+      var(--prefix-shiny-color) 0%,
+      var(--prefix-shiny-color) 42%,
+      var(--prefix-shiny-sheen) 48%,
+      #ffffff 50%,
+      var(--prefix-shiny-sheen) 52%,
+      var(--prefix-shiny-color) 58%,
+      var(--prefix-shiny-color) 100%
+    );
+    background-repeat: repeat;
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: prefix-shimmer 8s linear infinite;
+  }
+
   .animate-delay-100 {
     animation-delay: 100ms;
   }
@@ -193,6 +230,25 @@
   }
 }
 
+/* Блеск префикса: полоса едет слева направо (две плитки градиента за цикл). */
+@keyframes prefix-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Браузеры без background-clip: text показывают ровный цвет префикса. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .prefix-shiny {
+    background-image: none;
+    color: var(--prefix-shiny-color);
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -214,5 +270,11 @@
   .trade-preview,
   .trade-preview * {
     transition-duration: 420ms !important;
+  }
+
+  /* Блеск не бегает: префикс остаётся ровного цвета. */
+  .prefix-shiny {
+    animation: none;
+    background-position: -50% 0;
   }
 }
