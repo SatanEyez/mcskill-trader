@@ -14,12 +14,18 @@ import { EQUALITY_TOLERANCE_SHARE } from './trade-rules';
 export const MAX_GIVE_QUANTITY = 64;
 export const MIN_GIVE_QUANTITY = 1;
 /** Сколько разных предметов может быть в подобранном наборе. */
-export const MAX_EXCHANGE_LINES = 6;
+export const MAX_EXCHANGE_LINES = 10;
 /**
- * Потолок количества в строке набора. Не 64: если предмет дешёвый, а отдают
- * дорогой стак, добрать сумму иначе не получится. 640 — десять стаков.
+ * Потолок количества в строке набора — один стак. Больше 64 в одной позиции
+ * просить у игрока неудобно, поэтому разнообразие набирается числом позиций.
  */
-export const MAX_EXCHANGE_LINE_QUANTITY = 640;
+export const MAX_EXCHANGE_LINE_QUANTITY = 64;
+/**
+ * Страховка для очень дорогих предметов: 10 видов по 64 штуки могут не добрать
+ * сумму (например, «Инфинити сундук» ×64). Тогда разрешаем количества до 640,
+ * иначе сделка осталась бы вне допуска 10%.
+ */
+const FALLBACK_LINE_QUANTITY = 640;
 export const EXCHANGE_STORAGE_KEY = 'mcskill.exchange.v1';
 
 export interface ExchangeItem {
@@ -41,6 +47,8 @@ export interface ExchangePlan {
   tolerance: number;
   /** Модуль разницы в процентах от меньшей стороны. */
   gapPercent: number;
+  /** Разница со знаком: минус — получаю меньше, чем отдаю. */
+  signedGapPercent: number;
   /** Набор укладывается в допуск 10%. */
   ok: boolean;
 }
@@ -75,6 +83,8 @@ interface GreedyOptions {
   /** Первый предмет выбирать «якорем» по логарифму цены, а не самым дорогим. */
   anchor: boolean;
   random: () => number;
+  /** Потолок количества в строке: 64 для обычных наборов, 640 для страховки. */
+  quantityCap?: number;
 }
 
 function round2(value: number): number {
@@ -101,15 +111,28 @@ function mulberry32(seed: number): () => number {
 export function exchangeGap(
   given: number,
   received: number,
-): { delta: number; tolerance: number; gapPercent: number; ok: boolean } {
+): {
+  delta: number;
+  tolerance: number;
+  gapPercent: number;
+  signedGapPercent: number;
+  ok: boolean;
+} {
   const delta = round2(received - given);
   const smaller = Math.min(given, received);
   const base = smaller > 0 ? smaller : Math.max(given, received);
   const tolerance = round2(base * EQUALITY_TOLERANCE_SHARE);
-  const gapPercent = base > 0 ? (Math.abs(delta) / base) * 100 : 0;
+  const signedGapPercent = base > 0 ? (delta / base) * 100 : 0;
+  const gapPercent = Math.abs(signedGapPercent);
 
   // Полкопейки форы: иначе 10,000000001% показывались бы как нарушение.
-  return { delta, tolerance, gapPercent, ok: Math.abs(delta) <= tolerance + 0.005 };
+  return {
+    delta,
+    tolerance,
+    gapPercent,
+    signedGapPercent,
+    ok: Math.abs(delta) <= tolerance + 0.005,
+  };
 }
 
 function sumTotal(items: ExchangeItem[]): number {
@@ -119,19 +142,22 @@ function sumTotal(items: ExchangeItem[]): number {
 /**
  * Чем меньше — тем лучше.
  *
- * Порядок приоритетов: уложиться в допуск 10% → поменьше позиций в наборе →
- * поменьше разница → поменьше штук суммарно. Допуск — требование правил,
- * поэтому он жёстко важнее точности: набор из одной позиции с разницей 9%
- * полезнее, чем шесть позиций с разницей 0,001%. Количество в логарифме:
- * «479 дверей» точнее, но просить такое в игре никто не станет.
+ * Порядок приоритетов: уложиться в допуск 10% → набрать как можно больше
+ * разных предметов → поменьше разница → поменьше штук суммарно. Допуск —
+ * требование правил, поэтому он жёстко важнее точности. Число позиций важнее
+ * процента: набор из 10 видов с разницей 9% полезнее, чем набор из двух
+ * позиций с разницей 0,1%, — именно разнообразия не хватало в обменнике.
+ * Количество в логарифме: «480 дверей» точнее, но просить такое в игре
+ * никто не станет.
  */
 function planScore(items: ExchangeItem[], given: number): number {
   const total = sumTotal(items);
-  const gapPercent = given > 0 ? (Math.abs(given - total) / given) * 100 : 100;
+  const gap = exchangeGap(given, total);
   const quantity = items.reduce((sum, item) => sum + item.quantity, 0);
-  const penalty = exchangeGap(given, total).ok ? 0 : 1000;
+  const penalty = gap.ok ? 0 : 1000;
+  const missingLines = Math.max(0, MAX_EXCHANGE_LINES - items.length);
 
-  return penalty + items.length * 10 + gapPercent + Math.log10(quantity + 1) * 6;
+  return penalty + missingLines * 40 + gap.gapPercent + Math.log10(quantity + 1) * 6;
 }
 
 /** Ключ набора — чтобы один и тот же вариант не показывался дважды. */
@@ -228,11 +254,89 @@ function buildGreedy(given: number, pool: PricedItem[], options: GreedyOptions):
     const affordable = Math.floor(remaining / candidate.price + 1e-9);
     if (affordable < 1) break;
 
-    const maxQuantity = Math.min(affordable, MAX_EXCHANGE_LINE_QUANTITY);
+    const maxQuantity = Math.min(affordable, options.quantityCap ?? MAX_EXCHANGE_LINE_QUANTITY);
     const quantity =
       options.varyQuantity && maxQuantity > 1 && options.random() < 0.45
         ? Math.max(1, Math.round(maxQuantity * (0.3 + 0.7 * options.random())))
         : maxQuantity;
+
+    items.push({
+      resource: candidate.resource,
+      quantity,
+      unitPrice: candidate.price,
+      total: round2(candidate.price * quantity),
+    });
+    used.add(candidate.resource.id);
+
+    remaining = round2(Math.max(0, remaining - candidate.price * quantity));
+  }
+
+  return items;
+}
+
+interface SpreadOptions {
+  /** Сколько ближайших по цене предметов рассматривать для случайного выбора. */
+  window: number;
+  random: () => number;
+}
+
+/**
+ * Раскладывает сумму на много позиций: на каждом шаге делит остаток на число
+ * оставшихся слотов и берёт предмет, который целиком влезает в эту долю.
+ * Так набор почти всегда получается из `MAX_EXCHANGE_LINES` разных предметов,
+ * а не из одной дорогой позиции, как в жадном подборе.
+ *
+ * Если ни один предмет не влезает в долю (очень дорогой каталог или маленькая
+ * сумма), падаем в обычный жадный режим — позиций будет меньше, зато набор
+ * не останется пустым.
+ */
+function buildSpread(given: number, pool: PricedItem[], options: SpreadOptions): ExchangeItem[] {
+  const items: ExchangeItem[] = [];
+  const used = new Set<string>();
+  let remaining = given;
+
+  while (items.length < MAX_EXCHANGE_LINES && remaining > 0) {
+    const slotsLeft = MAX_EXCHANGE_LINES - items.length;
+    const share = remaining / slotsLeft;
+    let start = firstAffordable(pool, share);
+    let budget = share;
+
+    if (start >= pool.length) {
+      start = firstAffordable(pool, remaining);
+      budget = remaining;
+      if (start >= pool.length) break;
+    }
+
+    // Собираем неиспользованные варианты в окне рядом с верхней границей доли:
+    // они дают количество от 1 до 64 и тратят долю почти целиком.
+    const candidates: number[] = [];
+
+    for (let index = start; index < pool.length; index += 1) {
+      if (used.has(pool[index].resource.id)) continue;
+
+      candidates.push(index);
+      if (candidates.length >= Math.max(1, options.window)) break;
+    }
+
+    if (candidates.length === 0) break;
+
+    const offset =
+      candidates.length > 1
+        ? Math.min(
+            candidates.length - 1,
+            Math.floor(options.random() ** 1.6 * candidates.length),
+          )
+        : 0;
+    const candidate = pool[candidates[offset]];
+
+    if (candidate.price > remaining) break;
+
+    const affordable = Math.floor(remaining / candidate.price + 1e-9);
+    const inShare = Math.floor(budget / candidate.price + 1e-9);
+    const quantity = Math.max(
+      1,
+      Math.min(affordable, MAX_EXCHANGE_LINE_QUANTITY, inShare),
+    );
 
     items.push({
       resource: candidate.resource,
@@ -255,11 +359,16 @@ function buildGreedy(given: number, pool: PricedItem[], options: GreedyOptions):
  * набор из одной позиции с разницей 0,3% проигрывал бы набору из двух позиций
  * с разницей 0%.
  */
-function refine(items: ExchangeItem[], given: number, pool: PricedItem[]): ExchangeItem[] {
+function refine(
+  items: ExchangeItem[],
+  given: number,
+  pool: PricedItem[],
+  quantityCap: number = MAX_EXCHANGE_LINE_QUANTITY,
+): ExchangeItem[] {
   let best = items;
   let bestScore = planScore(best, given);
 
-  for (let pass = 0; pass < 4; pass += 1) {
+  for (let pass = 0; pass < 8; pass += 1) {
     let improved = false;
     const total = sumTotal(best);
 
@@ -267,11 +376,18 @@ function refine(items: ExchangeItem[], given: number, pool: PricedItem[]): Excha
       const line = best[index];
       const others = round2(total - line.total);
       const ideal = (given - others) / line.unitPrice;
+      const candidates = new Set<number>();
 
-      for (const quantity of [Math.floor(ideal), Math.ceil(ideal)]) {
-        if (!Number.isFinite(quantity) || quantity < 1) continue;
-        if (quantity > MAX_EXCHANGE_LINE_QUANTITY || quantity === line.quantity) continue;
+      for (const raw of [Math.floor(ideal), Math.ceil(ideal)]) {
+        if (!Number.isFinite(raw)) continue;
 
+        const quantity = Math.min(quantityCap, Math.max(1, raw));
+        if (quantity === line.quantity) continue;
+
+        candidates.add(quantity);
+      }
+
+      for (const quantity of candidates) {
         const next = best.slice();
         next[index] = { ...line, quantity, total: round2(line.unitPrice * quantity) };
 
@@ -296,7 +412,7 @@ function refine(items: ExchangeItem[], given: number, pool: PricedItem[]): Excha
           const candidate = pool[start];
           const quantity = Math.min(
             Math.floor(residual / candidate.price + 1e-9),
-            MAX_EXCHANGE_LINE_QUANTITY,
+            quantityCap,
           );
 
           if (quantity >= 1) {
@@ -355,9 +471,10 @@ function evaluatePlan(given: number, items: ExchangeItem[]): ExchangePlan {
 /**
  * Подбирает набор на вторую сторону под сумму `given`.
  *
- * Сначала считается точный жадный вариант, затем несколько десятков
- * случайных — из них собирается список разных наборов. `variant` листает
- * этот список: 0 — самый точный.
+ * Сначала считаются два точных варианта — «раскладка на много позиций» и
+ * классический жадный, — затем несколько десятков случайных. Варианты,
+ * у которых больше разных предметов, стоят в начале списка: именно их
+ * показывает кнопка «Другой вариант» по умолчанию.
  *
  * `null` — подбирать не из чего (нет предметов с ценой или сумма нулевая).
  */
@@ -374,31 +491,53 @@ export function assembleExchange(
 
   const collected = new Map<string, ExchangeItem[]>();
 
-  const collect = (raw: ExchangeItem[]) => {
+  const collect = (raw: ExchangeItem[], quantityCap = MAX_EXCHANGE_LINE_QUANTITY) => {
     if (raw.length === 0) return;
 
-    const refined = refine(raw, goal, pool);
+    const refined = refine(raw, goal, pool, quantityCap);
     const key = signature(refined);
 
     if (!collected.has(key)) collected.set(key, refined);
   };
 
-  // Первым делом — точный подбор: минимум строк и максимальная точность.
-  collect(buildGreedy(goal, pool, { window: 1, varyQuantity: false, anchor: false, random: () => 0 }));
+  // Точный вариант «на 10 видов» и классический жадный — как страховка,
+  // если раскладка по долям не сможет уложиться в допуск.
+  collect(buildSpread(goal, pool, { window: 1, random: () => 0 }));
+  collect(
+    buildGreedy(goal, pool, {
+      window: 1,
+      varyQuantity: false,
+      anchor: false,
+      random: () => 0,
+      quantityCap: FALLBACK_LINE_QUANTITY,
+    }),
+    FALLBACK_LINE_QUANTITY,
+  );
 
-  const attempts = Math.max(0, options.attempts ?? 40);
+  const attempts = Math.max(0, options.attempts ?? 36);
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const random = mulberry32((attempt + 1) * 0x9e3779b1);
-    // Чётные попытки идут «якорем» (набор из 1–2 позиций), нечётные —
-    // перебором ближайших по цене предметов (набор из 2–4 позиций).
-    const anchored = attempt % 2 === 0;
+
+    // Каждая третья попытка — «якорный» жадный набор (1–2 позиции),
+    // остальные — раскладка по долям с разным окном выбора.
+    if (attempt % 3 === 0) {
+      collect(
+        buildGreedy(goal, pool, {
+          window: 1,
+          varyQuantity: false,
+          anchor: true,
+          random,
+          quantityCap: FALLBACK_LINE_QUANTITY,
+        }),
+        FALLBACK_LINE_QUANTITY,
+      );
+      continue;
+    }
 
     collect(
-      buildGreedy(goal, pool, {
-        window: anchored ? 1 : 6,
-        varyQuantity: !anchored,
-        anchor: anchored,
+      buildSpread(goal, pool, {
+        window: attempt % 2 === 0 ? 4 : 14,
         random,
       }),
     );

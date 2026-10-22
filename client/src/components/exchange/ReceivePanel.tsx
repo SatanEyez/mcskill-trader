@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, PackageSearch, Shuffle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Info, PackageSearch, Shuffle, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { categoryStyle } from '../../lib/constants';
 import { readableNameColor } from '../../lib/color';
 import { formatPriceDots, formatQuantityDots, pluralize } from '../../lib/format';
 import { formatGapPercent } from '../../lib/trade-rules';
-import { MAX_EXCHANGE_LINES, type ExchangeResult } from '../../lib/exchange';
+import {
+  MAX_EXCHANGE_LINES,
+  MAX_EXCHANGE_LINE_QUANTITY,
+  type ExchangeResult,
+} from '../../lib/exchange';
 import { AutoFitText } from '../ui/AutoFitText';
 import { ItemImage } from '../ui/ItemImage';
 
@@ -20,6 +24,7 @@ interface ReceivePanelProps {
 export function ReceivePanel({ result, hasGiven, onReroll, className }: ReceivePanelProps) {
   const plan = result?.plan ?? null;
   const items = plan?.items ?? [];
+  const hasOversized = items.some((item) => item.quantity > MAX_EXCHANGE_LINE_QUANTITY);
 
   return (
     <section className={clsx('panel flex flex-col p-4', className)} aria-labelledby="exchange-receive-title">
@@ -35,7 +40,7 @@ export function ReceivePanel({ result, hasGiven, onReroll, className }: ReceiveP
             </h2>
           </div>
           <p className="mt-1 text-[11px] text-slate-500">
-            Подобрано автоматически по минимальным ценам
+            Автоматически: до {MAX_EXCHANGE_LINES} видов по 1–{MAX_EXCHANGE_LINE_QUANTITY} шт.
           </p>
         </div>
 
@@ -65,7 +70,7 @@ export function ReceivePanel({ result, hasGiven, onReroll, className }: ReceiveP
             </span>
             <span className="text-slate-600">·</span>
             <span className={plan.ok ? 'text-accent-300' : 'text-amber-200/80'}>
-              разница {formatGapPercent(plan.gapPercent)}
+              разница {formatGapPercent(plan.signedGapPercent)}
             </span>
           </p>
         )}
@@ -138,6 +143,14 @@ export function ReceivePanel({ result, hasGiven, onReroll, className }: ReceiveP
             </li>
           ))}
         </ul>
+      )}
+
+      {hasOversized && (
+        <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-500">
+          <Info className="mt-0.5 h-3 w-3 shrink-0 text-accent/70" aria-hidden />
+          На эту сумму 10 видов по {MAX_EXCHANGE_LINE_QUANTITY} шт. не хватает — количество
+          добрано выше, чтобы сделка уложилась в 10%.
+        </p>
       )}
 
       <div className="mt-3 flex items-center gap-2">

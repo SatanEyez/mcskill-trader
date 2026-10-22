@@ -10,6 +10,7 @@ import { PageLoader } from '../components/ui/Spinner';
 import { useCatalog } from '../hooks/useCatalog';
 import {
   MAX_EXCHANGE_LINES,
+  MAX_EXCHANGE_LINE_QUANTITY,
   MAX_GIVE_QUANTITY,
   assembleExchange,
   clampGiveQuantity,
@@ -117,7 +118,9 @@ export function ExchangePage() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
               Укажите предмет и количество, которое отдаёте, — набор на вторую сторону подберётся
-              сам по минимальным ценам, чтобы суммы сошлись минка к минке с допуском 10%.
+              сам по минимальным ценам: до {MAX_EXCHANGE_LINES} разных предметов по
+              1–{MAX_EXCHANGE_LINE_QUANTITY} штуки, чтобы суммы сошлись минка к минке с допуском
+              10%.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2 text-[10px]">
@@ -127,7 +130,7 @@ export function ExchangePage() {
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.02] px-2.5 py-1 text-slate-400">
                 <Boxes className="h-3 w-3 text-accent" aria-hidden />
-                До {MAX_EXCHANGE_LINES} предметов в наборе
+                До {MAX_EXCHANGE_LINES} видов по 1–{MAX_EXCHANGE_LINE_QUANTITY} шт.
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.02] px-2.5 py-1 text-slate-400">
                 <Scale className="h-3 w-3 text-accent" aria-hidden />

@@ -85,13 +85,16 @@ export function isWithinEqualityTolerance(result: TradeCalculationResult): boole
   return Math.abs(result.delta) <= equalityTolerance(result);
 }
 
-/** Процент разницы для интерфейса: «17,7%», «10,0%», «124,4%». */
+/** Процент разницы для интерфейса: «17,7%», «−2,5%», «0,0%». */
 export function formatGapPercent(value: number): string {
   if (!Number.isFinite(value)) return '—';
 
   // Один знак после запятой: иначе 17,73% превращалось в «18%» и расходилось
-  // с тем, что человек считает на калькуляторе.
-  return `${value.toFixed(1).replace('.', ',')}%`;
+  // с тем, что человек считает на калькуляторе. Минус — типографский, как
+  // в остальных числах интерфейса.
+  const rounded = Math.abs(value) < 0.05 ? 0 : value;
+
+  return `${rounded.toFixed(1).replace('.', ',').replace('-', '−')}%`;
 }
 
 /** Предметы, публичная раздача которых запрещена п. 9.7. */

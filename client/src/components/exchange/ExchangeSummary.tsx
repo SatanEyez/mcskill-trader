@@ -16,6 +16,7 @@ export function ExchangeSummary({ givenTotal, plan, className }: ExchangeSummary
   const ok = plan?.ok ?? false;
   const delta = plan?.delta ?? 0;
   const gapPercent = plan?.gapPercent ?? 0;
+  const signedGapPercent = plan?.signedGapPercent ?? 0;
   const tolerance = plan?.tolerance ?? 0;
 
   // Полоса заполняется по мере приближения к границе допуска.
@@ -111,13 +112,14 @@ export function ExchangeSummary({ givenTotal, plan, className }: ExchangeSummary
         <p className="mt-1.5 flex items-baseline justify-between gap-2 text-[10px] text-slate-600">
           <span>погрешность</span>
           <span className={clsx('tabular-nums', ok ? 'text-slate-500' : 'text-amber-200/80')}>
-            {plan ? formatGapPercent(gapPercent) : '—'} из 10%
+            {plan ? formatGapPercent(signedGapPercent) : '—'} из 10%
           </span>
         </p>
 
         <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
           Допуск — 10% от меньшей стороны сделки
           {plan && `: ±${formatPriceDots(tolerance)} монет`}. Правило 9.10.
+          {plan && signedGapPercent < 0 && ' Минус — получаете меньше, чем отдаёте.'}
         </p>
       </div>
     </section>
