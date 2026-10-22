@@ -1,6 +1,7 @@
 import { ChevronRight, ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { roleLabelOf } from '../../lib/identity';
 import { PrefixName } from '../ui/PrefixName';
 import { Logo } from '../layout/Logo';
 import { AdminAvatar } from './AdminAvatar';
@@ -14,7 +15,7 @@ export function AdminHeader() {
     navigate('/admin/login', { replace: true });
   };
 
-  const roleLabel = user?.role_name ?? (user?.role === 'owner' ? 'Владелец' : 'Администратор');
+  const roleLabel = roleLabelOf(user?.role_name, user?.role);
   const prefixColor = user?.prefix?.color ?? '#34D399';
 
   return (
@@ -46,27 +47,22 @@ export function AdminHeader() {
 
               <span className="hidden min-w-0 sm:block">
                 <span className="flex items-center gap-1.5">
-                  {user.prefix && (
-                    <span
-                      className="shrink-0 rounded-full border px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.08em]"
-                      style={{
-                        color: prefixColor,
-                        borderColor: `${prefixColor}55`,
-                        backgroundColor: `${prefixColor}1f`,
-                      }}
-                    >
-                      <PrefixName prefix={user.prefix} />
-                    </span>
-                  )}
+                  <span
+                    className="shrink-0 rounded-full border px-1.5 py-[1px] text-[9px] font-bold uppercase tracking-[0.08em]"
+                    style={{
+                      color: prefixColor,
+                      borderColor: `${prefixColor}55`,
+                      backgroundColor: `${prefixColor}1f`,
+                    }}
+                    // Роль прячем из вёрстки, но оставляем в подсказке — она не теряется.
+                    title={user.prefix ? `${user.prefix.name} · ${roleLabel}` : roleLabel}
+                  >
+                    {/* Один бейдж на двоих: есть префикс — он, нет — роль. */}
+                    {user.prefix ? <PrefixName prefix={user.prefix} /> : roleLabel}
+                  </span>
                   <span className="truncate text-xs font-semibold text-white">{user.login}</span>
                 </span>
-                <span className="mt-0.5 flex items-center gap-1 text-[9px] uppercase tracking-[0.14em] text-slate-500">
-                  {roleLabel}
-                  <span className="text-slate-700" aria-hidden>
-                    ·
-                  </span>
-                  <span className="text-accent/80 normal-case tracking-normal">Профиль</span>
-                </span>
+                <span className="mt-0.5 block truncate text-[9px] text-accent/80">Профиль</span>
               </span>
 
               <ChevronRight

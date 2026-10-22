@@ -1,6 +1,7 @@
 import { ShieldCheck, UsersRound } from 'lucide-react';
 import { useOnlineAdmins } from '../../hooks/useOnlineAdmins';
 import { pluralize } from '../../lib/format';
+import { roleLabelOf, showsRole } from '../../lib/identity';
 import { PrefixName } from '../ui/PrefixName';
 import { Spinner } from '../ui/Spinner';
 import { AdminAvatar } from '../admin/AdminAvatar';
@@ -82,9 +83,11 @@ export function OnlineAdmins() {
                       )}
                       {admin.login}
                     </span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {admin.role_name ?? 'Администратор'}
-                    </span>
+                    {showsRole(admin.prefix) && (
+                      <span className="block truncate text-xs text-slate-500">
+                        {roleLabelOf(admin.role_name)}
+                      </span>
+                    )}
                   </span>
                   <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" title="Онлайн" />
                 </li>

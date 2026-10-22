@@ -16,6 +16,7 @@ import {
 import clsx from 'clsx';
 import { ApiError, approveUser, rejectUser } from '../lib/api';
 import { formatDateTimeMsk, formatDuration, pluralize } from '../lib/format';
+import { showsRole } from '../lib/identity';
 import { notifyUsersChanged, useAdminUsers } from '../hooks/useAdminUsers';
 import { useStaff } from '../hooks/useStaff';
 import { useAuth } from '../context/AuthContext';
@@ -541,17 +542,19 @@ export function AdminUsersPage() {
                             )}
                             {target.login}
                           </p>
-                          {target.role === 'owner' && (
+                          {showsRole(target.prefix) && target.role === 'owner' && (
                             <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-400/25 bg-fuchsia-400/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-fuchsia-300">
                               <Crown className="h-2.5 w-2.5" aria-hidden />
                               Владелец
                             </span>
                           )}
-                          {target.role_name && target.role !== 'owner' && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-400">
-                              {target.role_name}
-                            </span>
-                          )}
+                          {showsRole(target.prefix) &&
+                            target.role_name &&
+                            target.role !== 'owner' && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-400">
+                                {target.role_name}
+                              </span>
+                            )}
                           {isSelf && (
                             <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-500">
                               это вы

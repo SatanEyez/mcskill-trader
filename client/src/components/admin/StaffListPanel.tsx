@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { formatDateTimeMsk, formatDuration, pluralize } from '../../lib/format';
+import { showsRole } from '../../lib/identity';
 import type { AdminRole, AdminStaffMeta, AdminUser } from '../../types';
 import { PrefixName } from '../ui/PrefixName';
 
@@ -227,18 +228,19 @@ export function StaffListPanel({
                           {member.login}
                         </p>
 
-                        {member.role === 'owner' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-400/25 bg-fuchsia-400/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-fuchsia-300">
-                            <Crown className="h-2.5 w-2.5" aria-hidden />
-                            Владелец
-                          </span>
-                        ) : (
-                          member.role_name && (
-                            <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-400">
-                              {member.role_name}
+                        {showsRole(member.prefix) &&
+                          (member.role === 'owner' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-400/25 bg-fuchsia-400/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-fuchsia-300">
+                              <Crown className="h-2.5 w-2.5" aria-hidden />
+                              Владелец
                             </span>
-                          )
-                        )}
+                          ) : (
+                            member.role_name && (
+                              <span className="inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[9px] uppercase tracking-wider text-slate-400">
+                                {member.role_name}
+                              </span>
+                            )
+                          ))}
 
                         <span
                           className={clsx(
