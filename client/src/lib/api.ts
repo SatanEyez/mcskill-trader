@@ -29,6 +29,7 @@ import type {
   ResourceInput,
   ResourceSort,
   ResourceStats,
+  SiteSettings,
   SupportTicket,
   TicketCounts,
   TicketKind,
@@ -805,6 +806,22 @@ export async function updateNews(id: string, input: Partial<NewsInput>): Promise
 export async function deleteNews(id: string): Promise<NewsPost> {
   const response = await request<{ data: NewsPost }>(`/news/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    auth: true,
+  });
+  return response.data;
+}
+
+// ── Настройки оформления ─────────────────────────────────────
+
+export async function fetchSiteSettings(): Promise<SiteSettings> {
+  const response = await request<{ data: SiteSettings }>('/settings');
+  return response.data;
+}
+
+export async function updateSiteSettings(input: Partial<SiteSettings>): Promise<SiteSettings> {
+  const response = await request<{ data: SiteSettings }>('/settings', {
+    method: 'PUT',
+    body: input,
     auth: true,
   });
   return response.data;

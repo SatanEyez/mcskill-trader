@@ -12,6 +12,8 @@ import {
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 import { prefetchRoute } from '../../lib/prefetch';
+import { useSiteSettings } from '../../context/SiteSettingsContext';
+import { PumpkinIcon } from '../halloween/HalloweenIcons';
 import { Logo } from './Logo';
 
 const NAV_LINK_CLASS =
@@ -27,6 +29,7 @@ const NAV_ITEMS = [
 
 export function Header() {
   const location = useLocation();
+  const { halloween } = useSiteSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -90,10 +93,17 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-slate-400 xl:inline-flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            McSkill · OneBlock
-          </span>
+          {halloween ? (
+            <span className="hidden items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/[0.07] px-3 py-1.5 text-[11px] font-semibold text-orange-200 xl:inline-flex">
+              <PumpkinIcon className="h-3.5 w-3.5" />
+              Хэллоуин · McSkill
+            </span>
+          ) : (
+            <span className="hidden items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-slate-400 xl:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              McSkill · OneBlock
+            </span>
+          )}
 
           <Link to="/admin" className="btn btn-secondary px-3 py-2 text-xs sm:px-4">
             <LockKeyhole className="h-4 w-4" aria-hidden />

@@ -18,6 +18,7 @@ import { newsRouter } from './modules/news/news.routes.js';
 import { presenceRouter } from './modules/presence/presence.routes.js';
 import { prefixRouter, roleRouter } from './modules/rbac/access.routes.js';
 import { resourceRouter } from './modules/resources/resource.routes.js';
+import { settingsRouter } from './modules/settings/settings.routes.js';
 import { statsRouter } from './modules/stats/stats.routes.js';
 import { supportRouter } from './modules/support/support.routes.js';
 import { tradeRouter } from './modules/trade/trade.routes.js';
@@ -88,6 +89,7 @@ export function createApp(): Express {
   app.use('/api/import', importRouter);
   app.use('/api/support', supportRouter);
   app.use('/api/news', newsRouter);
+  app.use('/api/settings', settingsRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/presence', presenceRouter);
   app.use('/api/chat', chatRouter);

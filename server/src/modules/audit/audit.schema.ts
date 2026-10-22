@@ -3,7 +3,17 @@ import { z } from 'zod';
 export const listAuditQuerySchema = z
   .object({
     group: z
-      .enum(['resources', 'categories', 'users', 'access', 'import', 'support', 'auth'])
+      .enum([
+        'resources',
+        'categories',
+        'users',
+        'access',
+        'import',
+        'support',
+        'news',
+        'settings',
+        'auth',
+      ])
       .optional(),
     period: z.enum(['24h', '7d', '30d', 'all']).optional().default('all'),
     user_id: z.string().uuid('Некорректный идентификатор администратора').optional(),

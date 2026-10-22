@@ -6,6 +6,7 @@ export type AuditGroup =
   | 'import'
   | 'support'
   | 'news'
+  | 'settings'
   | 'auth';
 export type AuditPeriod = '24h' | '7d' | '30d' | 'all';
 

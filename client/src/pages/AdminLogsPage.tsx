@@ -7,6 +7,7 @@ import {
   Newspaper,
   RefreshCw,
   ScrollText,
+  Settings,
   ShieldCheck,
   Tags,
   Upload,
@@ -46,6 +47,7 @@ const GROUP_ICONS: Record<AuditGroup, LucideIcon> = {
   import: Upload,
   support: MessageSquareWarning,
   news: Newspaper,
+  settings: Settings,
   auth: ShieldCheck,
 };
 
@@ -58,6 +60,7 @@ const GROUPS = [
   { value: 'import', label: 'Импорт' },
   { value: 'support', label: 'Обращения' },
   { value: 'news', label: 'Новости' },
+  { value: 'settings', label: 'Оформление' },
   { value: 'auth', label: 'Входы' },
 ] as const;
 

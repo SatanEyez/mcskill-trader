@@ -186,6 +186,7 @@ export type AuditGroup =
   | 'import'
   | 'support'
   | 'news'
+  | 'settings'
   | 'auth';
 export type AuditPeriod = '24h' | '7d' | '30d' | 'all';
 
@@ -402,6 +403,11 @@ export interface NewsInput {
   body: string;
   image_url: string;
   is_published: boolean;
+}
+
+/** Публичные настройки оформления сайта. */
+export interface SiteSettings {
+  halloween_enabled: boolean;
 }
 
 // ── Статистика посещений ─────────────────────────────────────

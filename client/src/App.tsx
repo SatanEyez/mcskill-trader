@@ -2,7 +2,9 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { ToastProvider } from './context/ToastContext';
+import { HalloweenDecor } from './components/halloween/HalloweenDecor';
 import { HomePage } from './pages/HomePage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { TradePage } from './pages/TradePage';
@@ -22,6 +24,7 @@ import { AdminImportPage } from './pages/AdminImportPage';
 import { AdminProfilePage } from './pages/AdminProfilePage';
 import { AdminPanelPage } from './pages/AdminPanelPage';
 import { AdminNewsPage } from './pages/AdminNewsPage';
+import { AdminAppearancePage } from './pages/AdminAppearancePage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminHeader } from './components/admin/AdminHeader';
@@ -142,11 +145,13 @@ function RequirePermission({
 export function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <ScrollToTopOnNavigate />
-          <VisitTracker />
-          <Routes>
+      <SiteSettingsProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <ScrollToTopOnNavigate />
+            <VisitTracker />
+            <div className="relative z-10">
+              <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/trade" element={<TradePage />} />
@@ -245,6 +250,16 @@ export function App() {
               }
             />
             <Route
+              path="/admin/appearance"
+              element={
+                <RequireAdmin>
+                  <RequirePermission permission="settings.manage">
+                    <AdminAppearancePage />
+                  </RequirePermission>
+                </RequireAdmin>
+              }
+            />
+            <Route
               path="/admin/stats"
               element={
                 <RequireAdmin>
@@ -275,9 +290,12 @@ export function App() {
               }
             />
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </ToastProvider>
-      </AuthProvider>
+              </Routes>
+            </div>
+            <HalloweenDecor />
+          </ToastProvider>
+        </AuthProvider>
+      </SiteSettingsProvider>
     </BrowserRouter>
   );
 }
