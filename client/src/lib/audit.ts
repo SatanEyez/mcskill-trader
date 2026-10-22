@@ -36,6 +36,7 @@ const ACTION_META: Record<string, AuditActionMeta> = {
   'news.create': { label: 'опубликовал новость', group: 'news', tone: 'emerald' },
   'news.update': { label: 'изменил новость', group: 'news', tone: 'cyan' },
   'news.delete': { label: 'удалил новость', group: 'news', tone: 'rose' },
+  'settings.update': { label: 'изменил оформление сайта', group: 'settings', tone: 'fuchsia' },
   'auth.login': { label: 'вошёл в панель', group: 'auth', tone: 'emerald' },
   'auth.login_failed': { label: 'неудачная попытка входа', group: 'auth', tone: 'rose' },
   'auth.login_blocked': { label: 'вход заблокирован', group: 'auth', tone: 'amber' },
@@ -196,6 +197,16 @@ export function describeAuditDetails(
     }
     if (prefix) {
       result.push(`префикс: ${prefix.from ?? '—'} → ${prefix.to ?? '—'}`);
+    }
+  }
+
+  if (action === 'settings.update') {
+    const halloween = details.halloween_enabled as
+      | { from?: boolean; to?: boolean }
+      | undefined;
+
+    if (halloween?.to !== undefined) {
+      result.push(`хэллоуин: ${halloween.from ? 'включён' : 'выключен'} → ${halloween.to ? 'включён' : 'выключен'}`);
     }
   }
 
