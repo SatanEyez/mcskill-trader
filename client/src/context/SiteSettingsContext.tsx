@@ -9,62 +9,73 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { fetchSiteSettings, updateSiteSettings as saveSiteSettings } from '../lib/api';
-import type { SiteSettings } from '../types';
+import { readStoredTheme, storeTheme } from '../lib/theme';
+import type { SiteSettings, SiteTheme } from '../types';
 
-const STORAGE_KEY = 'mcskill.site.halloween';
+const DEFAULT_THEME: SiteTheme = 'default';
 
 const DEFAULT_SETTINGS: SiteSettings = {
+  theme: DEFAULT_THEME,
   halloween_enabled: false,
+  new_year_enabled: false,
 };
 
 interface SiteSettingsContextValue {
   settings: SiteSettings;
   loading: boolean;
   error: string | null;
-  /** Включён ли сезонный режим — удобный флаг для компонентов. */
+  /** Активная тема — основной флаг для декора и префиксов. */
+  theme: SiteTheme;
+  /** Совместимость с местами, где проверялся только хэллоуин. */
   halloween: boolean;
+  newYear: boolean;
   updateSettings: (patch: Partial<SiteSettings>) => Promise<SiteSettings>;
 }
 
 const SiteSettingsContext = createContext<SiteSettingsContextValue | null>(null);
 
-function readStoredHalloween(): boolean | null {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    if (value === '1') return true;
-    if (value === '0') return false;
-  } catch {
-    // Приватный режим может запрещать localStorage.
-  }
+/**
+ * Приводит ответ API к полному набору полей.
+ *
+ * Старый сервер отдаёт только `halloween_enabled` — на этот случай выводим
+ * тему из флага, чтобы клиент и сервер можно было обновлять по отдельности.
+ */
+function normalizeSettings(data: Partial<SiteSettings> | null | undefined): SiteSettings {
+  const theme: SiteTheme =
+    data?.theme ??
+    (data?.new_year_enabled ? 'newyear' : data?.halloween_enabled ? 'halloween' : DEFAULT_THEME);
 
-  return null;
-}
-
-function storeHalloween(value: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
-  } catch {
-    // ignore
-  }
+  return {
+    theme,
+    halloween_enabled: theme === 'halloween',
+    new_year_enabled: theme === 'newyear',
+  };
 }
 
 /**
  * Глобальные настройки оформления.
  *
- * Последнее известное значение храним в localStorage, чтобы сезонный режим
- * не мигал при перезагрузке. Источник истины — API, после ответа состояние
- * синхронизируется. Класс `halloween` на <html> включает CSS-тему и декор.
+ * Последнюю известную тему храним в localStorage, чтобы сезонное оформление
+ * не мигало при перезагрузке. Источник истины — API, после ответа состояние
+ * синхронизируется. Классы `halloween` / `newyear` на <html> включают CSS-тему
+ * и декор, `data-theme` — общий признак для новых стилей.
  */
 export function SiteSettingsProvider({ children }: PropsWithChildren) {
-  const [settings, setSettings] = useState<SiteSettings>(() => ({
-    halloween_enabled: readStoredHalloween() ?? DEFAULT_SETTINGS.halloween_enabled,
-  }));
+  const [settings, setSettings] = useState<SiteSettings>(() => {
+    const stored = readStoredTheme();
+
+    return stored ? normalizeSettings({ theme: stored }) : DEFAULT_SETTINGS;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
-    document.documentElement.classList.toggle('halloween', settings.halloween_enabled);
-  }, [settings.halloween_enabled]);
+    const root = document.documentElement;
+
+    root.classList.toggle('halloween', settings.theme === 'halloween');
+    root.classList.toggle('newyear', settings.theme === 'newyear');
+    root.dataset.theme = settings.theme;
+  }, [settings.theme]);
 
   useEffect(() => {
     let active = true;
@@ -72,8 +83,9 @@ export function SiteSettingsProvider({ children }: PropsWithChildren) {
     fetchSiteSettings()
       .then((data) => {
         if (!active) return;
-        setSettings(data);
-        storeHalloween(data.halloween_enabled);
+        const normalized = normalizeSettings(data);
+        setSettings(normalized);
+        storeTheme(normalized.theme);
         setError(null);
       })
       .catch((cause) => {
@@ -90,9 +102,9 @@ export function SiteSettingsProvider({ children }: PropsWithChildren) {
   }, []);
 
   const updateSettings = useCallback(async (patch: Partial<SiteSettings>) => {
-    const data = await saveSiteSettings(patch);
+    const data = normalizeSettings(await saveSiteSettings(patch));
     setSettings(data);
-    storeHalloween(data.halloween_enabled);
+    storeTheme(data.theme);
     setError(null);
     return data;
   }, []);
@@ -102,7 +114,9 @@ export function SiteSettingsProvider({ children }: PropsWithChildren) {
       settings,
       loading,
       error,
-      halloween: settings.halloween_enabled,
+      theme: settings.theme,
+      halloween: settings.theme === 'halloween',
+      newYear: settings.theme === 'newyear',
       updateSettings,
     }),
     [settings, loading, error, updateSettings],

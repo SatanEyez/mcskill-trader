@@ -303,6 +303,8 @@ export function assembleExchange(
 export interface ExchangeState {
   resourceId: string | null;
   quantity: number;
+  /** Категория, по которой отфильтрованы варианты; `null` — все. */
+  categoryId: string | null;
 }
 
 export function clampGiveQuantity(value: number): number {
@@ -317,7 +319,11 @@ export function loadExchangeState(): ExchangeState | null {
     const raw = localStorage.getItem(EXCHANGE_STORAGE_KEY);
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as { resourceId?: unknown; quantity?: unknown } | null;
+    const parsed = JSON.parse(raw) as {
+      resourceId?: unknown;
+      quantity?: unknown;
+      categoryId?: unknown;
+    } | null;
     if (typeof parsed !== 'object' || parsed === null) return null;
 
     const resourceId = typeof parsed.resourceId === 'string' ? parsed.resourceId : null;
@@ -325,8 +331,10 @@ export function loadExchangeState(): ExchangeState | null {
       typeof parsed.quantity === 'number' && Number.isFinite(parsed.quantity)
         ? clampGiveQuantity(parsed.quantity)
         : MIN_GIVE_QUANTITY;
+    // Старые сохранения без фильтра читаются как «все категории».
+    const categoryId = typeof parsed.categoryId === 'string' ? parsed.categoryId : null;
 
-    return { resourceId, quantity };
+    return { resourceId, quantity, categoryId };
   } catch {
     return null;
   }

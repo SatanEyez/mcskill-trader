@@ -19,9 +19,9 @@ export const updateSiteSettings: RequestHandler = asyncHandler(async (req, res) 
     entityId: 'site',
     entityLabel: 'Оформление сайта',
     details: {
-      halloween_enabled: {
-        from: previous.halloween_enabled,
-        to: data.halloween_enabled,
+      theme: {
+        from: previous.theme,
+        to: data.theme,
       },
     },
   });

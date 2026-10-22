@@ -14,6 +14,7 @@ import clsx from 'clsx';
 import { prefetchRoute } from '../../lib/prefetch';
 import { useSiteSettings } from '../../context/SiteSettingsContext';
 import { PumpkinIcon } from '../halloween/HalloweenIcons';
+import { TreeIcon } from '../newyear/NewYearIcons';
 import { Logo } from './Logo';
 
 const NAV_LINK_CLASS =
@@ -29,7 +30,7 @@ const NAV_ITEMS = [
 
 export function Header() {
   const location = useLocation();
-  const { halloween } = useSiteSettings();
+  const { halloween, newYear } = useSiteSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -97,6 +98,11 @@ export function Header() {
             <span className="hidden items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/[0.07] px-3 py-1.5 text-[11px] font-semibold text-orange-200 xl:inline-flex">
               <PumpkinIcon className="h-3.5 w-3.5" />
               Хэллоуин · McSkill
+            </span>
+          ) : newYear ? (
+            <span className="hidden items-center gap-2 rounded-full border border-sky-400/25 bg-sky-400/[0.07] px-3 py-1.5 text-[11px] font-semibold text-sky-200 xl:inline-flex">
+              <TreeIcon className="h-3.5 w-3.5" />
+              Новый год · McSkill
             </span>
           ) : (
             <span className="hidden items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.025] px-3 py-1.5 text-[11px] font-medium text-slate-400 xl:inline-flex">

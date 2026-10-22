@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, Check, PackageSearch, Shuffle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Filter, PackageSearch, Shuffle, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { categoryStyle } from '../../lib/constants';
 import { readableNameColor } from '../../lib/color';
 import { formatPriceDots, formatQuantityDots, pluralize } from '../../lib/format';
 import { formatGapPercent } from '../../lib/trade-rules';
+import type { CategoryOption } from '../../lib/categories';
 import {
   EXCHANGE_OPTIONS_PER_PAGE,
   type ExchangeResult,
@@ -20,6 +21,11 @@ interface ReceivePanelProps {
   selected: number;
   onSelect: (index: number) => void;
   onReroll: () => void;
+  /** Категории каталога для фильтра вариантов. */
+  categories: CategoryOption[];
+  /** Активная категория; `null` — все категории. */
+  categoryId: string | null;
+  onCategoryChange: (categoryId: string | null) => void;
   className?: string;
 }
 
@@ -29,6 +35,9 @@ export function ReceivePanel({
   selected,
   onSelect,
   onReroll,
+  categories,
+  categoryId,
+  onCategoryChange,
   className,
 }: ReceivePanelProps) {
   const options = result?.options ?? [];
@@ -57,6 +66,40 @@ export function ReceivePanel({
           {result ? `${result.total} ${pluralize(result.total, ['вариант', 'варианта', 'вариантов'])}` : '0'}
         </span>
       </div>
+
+      {categories.length > 1 && (
+        <div className="mt-2.5 flex items-center gap-1.5">
+          <Filter className="h-3 w-3 shrink-0 text-slate-600" aria-hidden />
+          <div className="relative min-w-0 flex-1">
+            <select
+              value={categoryId ?? 'all'}
+              onChange={(event) =>
+                onCategoryChange(event.target.value === 'all' ? null : event.target.value)
+              }
+              className={clsx(
+                'w-full appearance-none truncate rounded-lg border bg-white/[0.02] py-1 pl-2 pr-6 text-[10px] outline-none transition',
+                'hover:border-white/15 hover:text-slate-200 focus:border-accent/40 focus:text-slate-100',
+                categoryId
+                  ? 'border-accent/30 text-accent-300'
+                  : 'border-white/[0.06] text-slate-500',
+              )}
+              title="Показывать варианты только из выбранной категории"
+              aria-label="Категория вариантов"
+            >
+              <option value="all">Все категории</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-600"
+              aria-hidden
+            />
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 border-b border-white/[0.05] pb-3">
         <div className="flex min-w-0 items-baseline gap-1.5">

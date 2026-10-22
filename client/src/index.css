@@ -968,3 +968,397 @@ html.halloween header a[aria-current='page']::after {
     animation: none !important;
   }
 }
+
+/* ── Новый год ───────────────────────────────────────────────
+ * Сезонный слой включается классом `newyear` на <html> (его ставит
+ * SiteSettingsContext по активной теме). Гамма холодная — лёд, снег,
+ * изумруд ёлки; акцент сайта остаётся зелёным, поэтому кнопки и чипы
+ * выглядят «своими», а не чужой темой.
+ */
+
+html.newyear body {
+  background-image:
+    radial-gradient(ellipse 70% 45% at 50% -12%, rgba(56, 189, 248, 0.13), transparent 65%),
+    radial-gradient(ellipse 45% 35% at 100% 22%, rgba(52, 211, 153, 0.07), transparent 65%),
+    radial-gradient(ellipse 40% 35% at 0% 82%, rgba(147, 197, 253, 0.055), transparent 65%);
+}
+
+html.newyear ::selection {
+  background: rgba(56, 189, 248, 0.3);
+  color: #f0f9ff;
+}
+
+html.newyear .panel {
+  border-color: rgba(125, 211, 252, 0.12);
+  background-image: linear-gradient(
+    155deg,
+    rgba(56, 189, 248, 0.04),
+    transparent 42%,
+    rgba(52, 211, 153, 0.03)
+  );
+}
+
+html.newyear .panel:hover {
+  border-color: rgba(125, 211, 252, 0.22);
+}
+
+html.newyear .btn-primary {
+  background-image: linear-gradient(135deg, #e0f2fe 0%, #7dd3fc 46%, #34d399 100%);
+  color: #05202b;
+  box-shadow:
+    0 0 34px -12px rgba(125, 211, 252, 0.85),
+    0 8px 24px -16px rgba(0, 0, 0, 0.9);
+}
+
+html.newyear .btn-primary:hover {
+  background-image: linear-gradient(135deg, #f0f9ff 0%, #bae6fd 45%, #6ee7b7 100%);
+}
+
+html.newyear .btn-secondary:hover {
+  border-color: rgba(125, 211, 252, 0.35);
+  color: #f0f9ff;
+}
+
+html.newyear .icon-btn:hover {
+  border-color: rgba(125, 211, 252, 0.35);
+  background: rgba(56, 189, 248, 0.1);
+  color: #bae6fd;
+}
+
+html.newyear .field:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.14);
+}
+
+html.newyear .text-gradient {
+  background-image: linear-gradient(90deg, #e0f2fe 0%, #7dd3fc 42%, #6ee7b7 100%);
+}
+
+html.newyear .bg-hero-glow {
+  background-image:
+    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(56, 189, 248, 0.16), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 82% 18%, rgba(52, 211, 153, 0.08), transparent 70%);
+}
+
+html.newyear .news-prose a {
+  color: #7dd3fc;
+}
+
+html.newyear header.sticky {
+  border-color: rgba(125, 211, 252, 0.1);
+}
+
+html.newyear header a[aria-current='page'] {
+  color: #e0f2fe;
+}
+
+html.newyear header a[aria-current='page']::after {
+  background: #7dd3fc;
+}
+
+/* ── Фоновые элементы ──────────────────────────────────────── */
+
+.newyear-decor {
+  contain: strict;
+}
+
+.newyear-glow {
+  position: absolute;
+  height: 58vw;
+  width: 58vw;
+  border-radius: 999px;
+  filter: blur(38px);
+  opacity: 0.9;
+}
+
+.newyear-glow-left {
+  left: -24%;
+  top: 14%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.12), transparent 66%);
+}
+
+.newyear-glow-right {
+  right: -26%;
+  top: 46%;
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.09), transparent 66%);
+}
+
+.newyear-moon {
+  position: absolute;
+  top: 4.5rem;
+  right: 6%;
+  height: 140px;
+  width: 140px;
+  color: #e0f2fe;
+  opacity: 0.15;
+  transform: rotate(-18deg);
+  filter: drop-shadow(0 0 60px rgba(186, 230, 253, 0.4));
+  animation: newyear-moon-float 13s ease-in-out infinite;
+}
+
+/* Провод гирлянды: тонкая дуга, лампочки висят на ней по параболе.
+ * Верхний край опущен под шапку (64 px): иначе полупрозрачная шапка
+ * просвечивала лампочками и меню читалось хуже. */
+.newyear-garland {
+  position: absolute;
+  inset: 4.6rem 0 auto 0;
+  height: 30px;
+  color: #bae6fd;
+}
+
+.newyear-wire {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0.22;
+}
+
+.newyear-bulb {
+  position: absolute;
+  height: 9px;
+  width: 7px;
+  border-radius: 50% 50% 45% 45%;
+  background: currentColor;
+  opacity: 0.5;
+  box-shadow:
+    0 0 9px 1px currentColor,
+    0 0 22px 4px color-mix(in srgb, currentColor 38%, transparent);
+  animation: newyear-bulb-glow 3.6s ease-in-out infinite;
+}
+
+.newyear-flake {
+  position: absolute;
+  color: #bae6fd;
+  opacity: 0.1;
+  animation: newyear-flake-spin 44s linear infinite;
+}
+
+.newyear-flake-1 {
+  left: 5%;
+  top: 24%;
+  width: 128px;
+}
+
+.newyear-flake-2 {
+  right: 11%;
+  top: 54%;
+  width: 88px;
+  opacity: 0.075;
+  animation-duration: 60s;
+  animation-direction: reverse;
+}
+
+.newyear-flake-3 {
+  left: 33%;
+  top: 72%;
+  width: 62px;
+  opacity: 0.055;
+  animation-duration: 72s;
+}
+
+.newyear-tree {
+  position: absolute;
+  bottom: 0.8rem;
+  height: auto;
+  width: 104px;
+  opacity: 0.26;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 0 26px rgba(52, 211, 153, 0.35));
+  animation: newyear-tree-sway 9s ease-in-out infinite;
+}
+
+.newyear-tree-left {
+  left: 1.2rem;
+}
+
+.newyear-tree-right {
+  right: 1.2rem;
+  animation-delay: -4.5s;
+}
+
+.newyear-gift {
+  position: absolute;
+  bottom: 1.4rem;
+  height: auto;
+  width: 46px;
+  opacity: 0.2;
+  filter: drop-shadow(0 0 18px rgba(248, 113, 113, 0.35));
+  animation: newyear-gift-bob 7s ease-in-out infinite;
+}
+
+.newyear-gift-left {
+  left: 8.2rem;
+}
+
+.newyear-gift-right {
+  right: 8.2rem;
+  animation-delay: -3.4s;
+}
+
+.newyear-snow {
+  position: absolute;
+  top: -6vh;
+  border-radius: 999px;
+  background: #e0f2fe;
+  box-shadow: 0 0 7px 1px rgba(224, 242, 254, 0.65);
+  animation-name: newyear-snowfall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.newyear-snowbank {
+  position: absolute;
+  inset: auto -10% -8% -10%;
+  height: 30%;
+  background:
+    radial-gradient(ellipse at 22% 100%, rgba(224, 242, 254, 0.11), transparent 62%),
+    radial-gradient(ellipse at 72% 100%, rgba(186, 230, 253, 0.09), transparent 62%);
+  filter: blur(40px);
+}
+
+/* ── Префиксы под тему ───────────────────────────────────────
+ * Цвет префикса считает `themePrefixColor` (lib/theme.ts) и отдаёт уже
+ * смешанным, поэтому здесь только свечение и характер искр. У «shiny»
+ * буквы прозрачные, тень по глифам всё равно рисуется — свечение читается.
+ */
+
+.prefix-name {
+  transition: color 0.35s ease;
+}
+
+html.newyear .prefix-name,
+html.newyear .prefix-shiny {
+  text-shadow: 0 0 14px rgba(186, 230, 253, 0.45);
+}
+
+html.halloween .prefix-name,
+html.halloween .prefix-shiny {
+  text-shadow: 0 0 12px rgba(251, 146, 60, 0.4);
+}
+
+/* Зимой блеск идёт медленнее — как иней, а не как искра. */
+html.newyear .prefix-shiny {
+  animation-duration: 7s;
+}
+
+html.newyear .prefix-spark {
+  --prefix-spark-color: #e0f2fe;
+  filter: drop-shadow(0 0 0.2em #bae6fd);
+}
+
+html.halloween .prefix-spark {
+  --prefix-spark-color: #fdba74;
+  filter: drop-shadow(0 0 0.18em #fb923c);
+}
+
+@keyframes newyear-snowfall {
+  from {
+    transform: translate3d(0, -8vh, 0);
+  }
+  to {
+    transform: translate3d(5vw, 108vh, 0);
+  }
+}
+
+@keyframes newyear-bulb-glow {
+  0%,
+  100% {
+    opacity: 0.32;
+    filter: brightness(0.85);
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(1.25);
+  }
+}
+
+@keyframes newyear-flake-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes newyear-tree-sway {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+
+@keyframes newyear-gift-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@keyframes newyear-moon-float {
+  0%,
+  100% {
+    transform: rotate(-18deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-14deg) translateY(-10px);
+  }
+}
+
+@media (max-width: 640px) {
+  .newyear-moon {
+    top: 4.4rem;
+    right: -2.2rem;
+    height: 96px;
+    width: 96px;
+    opacity: 0.12;
+  }
+
+  .newyear-garland {
+    top: 4.5rem;
+    height: 24px;
+  }
+
+  .newyear-bulb {
+    height: 7px;
+    width: 5px;
+  }
+
+  .newyear-tree {
+    width: 68px;
+    opacity: 0.2;
+  }
+
+  .newyear-tree-right,
+  .newyear-gift-right,
+  .newyear-flake-3 {
+    display: none;
+  }
+
+  .newyear-gift {
+    left: 5.4rem;
+    width: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newyear-snow,
+  .newyear-bulb,
+  .newyear-flake {
+    display: none;
+  }
+
+  .newyear-moon,
+  .newyear-tree,
+  .newyear-gift {
+    animation: none !important;
+  }
+}

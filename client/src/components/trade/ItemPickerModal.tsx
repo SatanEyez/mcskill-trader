@@ -3,6 +3,7 @@ import { Check, PackageSearch, Plus, Search, Store, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Resource } from '../../types';
 import { UNCATEGORIZED_LABEL } from '../../lib/constants';
+import { collectCategories } from '../../lib/categories';
 import { readableNameColor } from '../../lib/color';
 import { formatPrice, searchScore } from '../../lib/format';
 import { MAX_TRADE_LINES } from '../../lib/trade';
@@ -41,18 +42,7 @@ export function ItemPickerModal({
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const atLimit = !single && selectedIds.length >= MAX_TRADE_LINES;
 
-  const categories = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const resource of resources) {
-      const key = resource.category_id ?? 'none';
-      if (!map.has(key)) map.set(key, resource.category);
-    }
-
-    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
-      a.name.localeCompare(b.name, 'ru'),
-    );
-  }, [resources]);
+  const categories = useMemo(() => collectCategories(resources), [resources]);
 
   const filtered = useMemo(() => {
     const trimmed = query.trim();

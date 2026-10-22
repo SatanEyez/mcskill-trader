@@ -8,6 +8,7 @@ import { ExchangeSummary } from '../components/exchange/ExchangeSummary';
 import { ItemPickerModal } from '../components/trade/ItemPickerModal';
 import { PageLoader } from '../components/ui/Spinner';
 import { useCatalog } from '../hooks/useCatalog';
+import { collectCategories, filterByCategory } from '../lib/categories';
 import {
   EXCHANGE_OPTIONS_PER_PAGE,
   MAX_EXCHANGE_QUANTITY,
@@ -24,6 +25,8 @@ export function ExchangePage() {
 
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  /** Категория получаемых вариантов: `null` — все категории. */
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -51,6 +54,18 @@ export function ExchangePage() {
       }
 
       setQuantity(stored.quantity);
+
+      // Категорию восстанавливаем только если она ещё существует в каталоге.
+      if (
+        stored.categoryId &&
+        resources.some(
+          (resource) =>
+            resource.category_id === stored.categoryId ||
+            (stored.categoryId === 'none' && resource.category_id === null),
+        )
+      ) {
+        setCategoryId(stored.categoryId);
+      }
     }
 
     setHydrated(true);
@@ -58,8 +73,8 @@ export function ExchangePage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveExchangeState({ resourceId, quantity });
-  }, [hydrated, resourceId, quantity]);
+    saveExchangeState({ resourceId, quantity, categoryId });
+  }, [hydrated, resourceId, quantity, categoryId]);
 
   const given = useMemo(
     () => (resourceId ? (resources.find((resource) => resource.id === resourceId) ?? null) : null),
@@ -71,12 +86,24 @@ export function ExchangePage() {
     [given, quantity],
   );
 
+  const categories = useMemo(() => collectCategories(resources), [resources]);
+
+  /**
+   * Пул для подбора. Фильтр по категории сужает только сторону «получаю»:
+   * отдаваемый предмет ищется по всему каталогу, иначе после выбора категории
+   * часть вариантов исчезала бы без объяснения.
+   */
+  const pool = useMemo(
+    () => filterByCategory(resources, categoryId),
+    [resources, categoryId],
+  );
+
   const result = useMemo(
     () =>
       given
-        ? assembleExchange(givenTotal, resources, { excludeId: given.id, page })
+        ? assembleExchange(givenTotal, pool, { excludeId: given.id, page })
         : null,
-    [given, givenTotal, page, resources],
+    [given, givenTotal, page, pool],
   );
 
   // Каталог может обновиться, пока открыта страница: не оставляем выбор
@@ -98,6 +125,13 @@ export function ExchangePage() {
     setPage(0);
     setSelected(0);
     setPickerOpen(false);
+  }, []);
+
+  const handleCategoryChange = useCallback((next: string | null) => {
+    setCategoryId(next);
+    // Другой пул — другие варианты: возвращаемся к первой странице.
+    setPage(0);
+    setSelected(0);
   }, []);
 
   const handleClear = useCallback(() => {
@@ -221,6 +255,9 @@ export function ExchangePage() {
                   hasGiven={Boolean(given)}
                   selected={selectedIndex}
                   onSelect={setSelected}
+                  categories={categories}
+                  categoryId={categoryId}
+                  onCategoryChange={handleCategoryChange}
                   onReroll={() => {
                     setPage((current) => current + 1);
                     setSelected(0);

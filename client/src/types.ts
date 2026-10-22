@@ -405,9 +405,19 @@ export interface NewsInput {
   is_published: boolean;
 }
 
+/**
+ * Тема оформления сайта. Активна ровно одна: обычная, хэллоуин или новый год.
+ * Сезонная тема перекрашивает интерфейс, включает фоновый декор и меняет
+ * оформление префиксов администраторов.
+ */
+export type SiteTheme = 'default' | 'halloween' | 'newyear';
+
 /** Публичные настройки оформления сайта. */
 export interface SiteSettings {
+  theme: SiteTheme;
+  /** Производные от `theme` — оставлены для совместимости. */
   halloween_enabled: boolean;
+  new_year_enabled: boolean;
 }
 
 // ── Статистика посещений ─────────────────────────────────────

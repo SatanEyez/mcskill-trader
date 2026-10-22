@@ -201,12 +201,24 @@ export function describeAuditDetails(
   }
 
   if (action === 'settings.update') {
+    const theme = details.theme as { from?: string; to?: string } | undefined;
+
+    if (theme?.to) {
+      const label = (value?: string) =>
+        value === 'halloween' ? 'Хэллоуин' : value === 'newyear' ? 'Новый год' : 'Обычное';
+
+      result.push(`оформление: ${label(theme.from)} → ${label(theme.to)}`);
+    }
+
+    // Записи, сделанные до появления тем: журнал не переписываем.
     const halloween = details.halloween_enabled as
       | { from?: boolean; to?: boolean }
       | undefined;
 
-    if (halloween?.to !== undefined) {
-      result.push(`хэллоуин: ${halloween.from ? 'включён' : 'выключен'} → ${halloween.to ? 'включён' : 'выключен'}`);
+    if (!theme?.to && halloween?.to !== undefined) {
+      result.push(
+        `хэллоуин: ${halloween.from ? 'включён' : 'выключен'} → ${halloween.to ? 'включён' : 'выключен'}`,
+      );
     }
   }
 

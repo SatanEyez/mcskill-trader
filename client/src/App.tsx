@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SiteSettingsProvider } from './context/SiteSettingsContext';
 import { ToastProvider } from './context/ToastContext';
 import { HalloweenDecor } from './components/halloween/HalloweenDecor';
+import { NewYearDecor } from './components/newyear/NewYearDecor';
 import { HomePage } from './pages/HomePage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { TradePage } from './pages/TradePage';
@@ -293,6 +294,7 @@ export function App() {
               </Routes>
             </div>
             <HalloweenDecor />
+            <NewYearDecor />
           </ToastProvider>
         </AuthProvider>
       </SiteSettingsProvider>
