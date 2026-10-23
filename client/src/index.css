@@ -38,6 +38,25 @@
     font: inherit;
   }
 
+  /*
+   * Нативный выпадающий список в Windows/Chrome по умолчанию белый.
+   * На тёмной теме светлый текст превращается в невидимый, поэтому
+   * принудительно включаем тёмную схему и задаём цвета пунктам.
+   */
+  select {
+    color-scheme: dark;
+  }
+
+  select option {
+    background-color: #0b1219;
+    color: #e2e8f0;
+  }
+
+  select option:checked {
+    background-color: #12312a;
+    color: #a7f3d0;
+  }
+
   input[type='number']::-webkit-outer-spin-button,
   input[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
